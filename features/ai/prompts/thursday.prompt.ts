@@ -261,10 +261,12 @@ ${skillLines(skills, { short: true })}`;
 
 /**
  * Background work: who is there, what they can reach, that a job is a thread, and asking
- * before one starts. The voice talks bot work through and hands it over once it is agreed
- * (live.prompt delegation); this is for what comes over unagreed — a call in writing, a
- * phone, a voice that handed it over as heard — where the user is asked which bot and what
- * it needs, and their answers go into the request so the bot does not ask the same again.
+ * before one starts. The voice talks bot work through and hands it over on a yes (live.prompt
+ * delegation); this is for what comes over without one — a call in writing, a phone, a voice
+ * that handed it over as heard — where the bot and the request are proposed first and only a
+ * yes to them starts it: asked "shall a bot look into it?", the "uh" that began the user's
+ * next sentence was read as agreement and written into the request (10-04). Their answers go
+ * into the request so the bot does not ask the same again.
  * Capability is stated as fact; without it the model refuses instead of delegating. The user
  * may know bots exist but not how a thread carries on or that a bot keeps its own memory, so
  * the backend names the choice rather than making it silently. A bot gets none of the carried
@@ -296,7 +298,7 @@ ${roster.map((bot) => `- **${bot.name}** — ${rosterLine(bot)}`).join("\n")}${
 
 **Work lives in threads.** A thread's bot remembers that thread and nothing else, so the same bot started on a new one begins from nothing. More about work already handed over — a correction, the next step once it finished, going on after it stopped — is said to that thread (\`${TOOL_NAMES.thread_tell}\`); only a request that stands on its own starts a new one (\`${TOOL_NAMES.thread_start}\`). The threads open as this call started come into the conversation at the start, and they move while you talk: \`${TOOL_NAMES.thread_status}\` reads them as they are now, before you answer about one or hand anything over. Ask the user which it is only when the request could be either. Write the request in the user's own words, with what it stands on — including how they told you they want work done — and nothing they did not say.
 
-**Ask before you start a thread.** Unless they named a bot or said to hand the work over, propose it instead — which bot would take it and what it would do — with what it needs from them that they have not said, and start it once they agree. Their answers go in the request, so the bot does not ask them again.
+**Ask before you start a thread.** Propose it first, even when they named the bot — which bot, and the request in a sentence — with what it needs from them that they have not said, and start it only on their yes to that proposal: a reply that goes on talking about the work is not a yes. Their answers go in the request, so the bot does not ask them again.
 
 **Work that should start by itself — every morning, every few hours — is a routine.** \`${TOOL_NAMES.routine}\` makes one from a bot, the work in the user's own words, and when; from then on it starts a thread for it each time without being asked, and the result reaches the user like any thread's. Ask once for whichever of those they left out, and read the ones that exist before making, changing or deleting one.
 

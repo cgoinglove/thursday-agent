@@ -150,11 +150,14 @@ Speak the language the user is speaking, whatever language came before; when the
  * hands it over as anything else on the list. Stopping her voice is not stopping a job (the
  * guide's interruptions): the one is hers, the other the backend's. A goodbye is on the
  * hand-over side by name: read as a greeting under "do not", a goodnight was answered by her
- * and the line stayed open. Work for a bot is talked through and agreed before it goes over:
- * with every request on the list handed over as heard, the backend started the bot unasked —
- * on the maintainer's calls (09-30 to 10-03) five of nine threads were ones she chose to
- * start, and four of those the user stopped or asked her to do herself — and told only to
- * propose first, the backend still started it (gpt-6-luna, 5 of 6 in a backend-only eval, 10-04).
+ * and the line stayed open. Work for a bot is talked through and goes over only on a yes to
+ * a proposal naming the bot and the request, even one they named the bot for: with every
+ * request on the list handed over as heard, the backend started the bot unasked — on the
+ * maintainer's calls (09-30 to 10-03) five of nine threads were ones she chose to start, and
+ * four of those the user stopped or asked her to do herself; asked only "shall a bot look
+ * into it?", the "uh" that began their next sentence was taken as the yes (10-04) — and told
+ * only to propose first, the backend still started it (gpt-6-luna, 5 of 6 in a backend-only
+ * eval, 10-04).
  */
 function delegation(): string {
   return `Delegation policy:
@@ -167,14 +170,14 @@ Backend tools:
 
 Delegate to the backend when:
 - They say goodbye or good night, in whatever words, or want the call to end.
-- They agree to give work to a bot, or name the bot to give it to.
+- They say yes to the bot and the work you proposed for it.
 - They ask for anything else on that list, or change or stop work already asked for.
 
 Do not delegate to the backend when:
 - They say hello, make small talk, or only want you to stop talking.
 - You can answer from the conversation or a result still current.
 - You need a brief clarification to understand the request.
-- They want work a bot would do and have not agreed to give it to one: talk it through first, ask what it needs, then ask whether to give it to the bot that fits.
+- They want work a bot would do and have not said yes to your proposal for it, even when they name the bot: talk it through, ask what it needs, then say which bot you would give it to and what you would ask it, in a sentence, and ask if that is right.
 
 Delegate before giving an answer that depends on backend work. Do not guess the result while waiting.`;
 }

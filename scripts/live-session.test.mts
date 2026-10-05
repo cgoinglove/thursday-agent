@@ -1658,7 +1658,7 @@ test("both call prompts open as one Thursday: the voice gets the guide's delegat
     assert.equal(/What bots can reach for|- Web:/.test(on.text), false);
     assert.match(
       on.text,
-      /- They want work a bot would do and have not agreed to give it to one: [^\n]+\n/,
+      /- They want work a bot would do and have not said yes to your proposal for it, even when they name the bot: [^\n]+\n/,
     );
     // Stopping her voice is hers, stopping a job the backend's
     assert.match(on.text, /or only want you to stop talking/);
