@@ -1,6 +1,6 @@
 {
   "name": "thursday-agent",
-  "version": "0.28.0",
+  "version": "0.29.0",
   "description": "A voice agent that runs on your own machine — talk to her, she hands the slow work to bots with a shell, a browser and skills.",
   "license": "MIT",
   "keywords": [
