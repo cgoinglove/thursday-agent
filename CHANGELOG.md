@@ -1,5 +1,17 @@
 # Changelog
 
+## [0.29.0](https://github.com/cgoinglove/thursday-agent/compare/thursday-agent-v0.28.0...thursday-agent-v0.29.0) (2026-10-05)
+
+
+### Features
+
+* **prompts:** enhance live and thursday prompts with job bot integration ([ff009d0](https://github.com/cgoinglove/thursday-agent/commit/ff009d070a764472f64ef0ab5c0db5ba20b04cb8))
+
+
+### Fixes
+
+* **call:** a bot starts only on a yes to a proposal naming the bot and the request ([3cfacc4](https://github.com/cgoinglove/thursday-agent/commit/3cfacc4be270586a06e5f1128a4d4da35364f795))
+
 ## [0.28.0](https://github.com/cgoinglove/thursday-agent/compare/thursday-agent-v0.27.0...thursday-agent-v0.28.0) (2026-10-01)
 
 
