@@ -1,4 +1,6 @@
 import { RECENT_CALL } from "@/config";
+import { listJobBots } from "@/features/bot/bot.query";
+import { type JobBot, rosterLine } from "@/features/bot/bot.schema";
 import { listNoteIndex, readNotes } from "@/features/memory/memory.query";
 import {
   MEMORY_ALWAYS_LISTED,
@@ -24,10 +26,10 @@ import {
 /**
  * Everything the Live voice hears: who Thursday is and who she is to talk to (persona), the
  * guide's starter backchannel and interruption policies, its delegation policy (what the
- * backend can do, when to hand over and when not), what she knows about the user, and what
- * was said on the last calls. How the work is done, the threads and
- * tidying memory are the backend's (thursday.prompt): the voice hands everything but
- * conversation over and answers from what comes back. Assembled on every call, never cached.
+ * backend can do, when to hand over and when not), the bots by name, what she knows about the
+ * user, and what was said on the last calls. How the work is done, the threads and tidying
+ * memory are the backend's (thursday.prompt): the voice talks work through, hands it over once
+ * it is agreed, and answers from what comes back. Assembled on every call, never cached.
  */
 export async function loadLivePrompt(options: {
   /** Settings › Thursday › Style, in their own words: over the picked character, never replacing it. */
@@ -50,11 +52,12 @@ export async function loadLivePrompt(options: {
    */
   plan?: boolean;
 }): Promise<{ text: string; opening: string; here: boolean }> {
-  const [open, index, calls] = await Promise.all([
+  const [open, index, calls, roster] = await Promise.all([
     // Written out in the prompt, which is not the user asking for them: no read counted
     readNotes(MEMORY_ALWAYS_LISTED, { touch: false }),
     listNoteIndex(),
     listRecentTurns(RECENT_CALL.rows),
+    listJobBots(),
   ]);
 
   const first = !open.notes.find((note) => note.path === "profile")?.facts
@@ -65,6 +68,7 @@ export async function loadLivePrompt(options: {
     thursdayIdentity(new Date(), options.where),
     personaLines(options.persona),
     always(),
+    yourBots(roster),
     options.plan ? channels() : "",
     known(open.notes, index),
     first ? firstCall(!earlier) : "",
@@ -138,34 +142,54 @@ Speak the language the user is speaking, whatever language came before; when the
  * The guide's three labels, as it asks: Live decides for itself whether to hand a turn over,
  * and reads that from what the list says the backend can do. Without the list it said "yes"
  * to a hang-up, a stop or a routine and handed nothing over. The list names what can be done,
- * never how: tools, bots and threads stay the backend's. What they say about themselves is not
+ * never how: tools and threads stay the backend's, and the bots are named (yourBots) only so
+ * she can ask which one. What they say about themselves is not
  * a line of its own: a spoken call is read for it once it ends (features/memory/call-memory),
  * and a line asking her to hand it over was followed rarely (0/12 names) and, pressed, cost a
  * hold phrase and a 6-9 s wait each time (5e257b67, reverted in 094fc026). Asked to keep something, she
  * hands it over as anything else on the list. Stopping her voice is not stopping a job (the
  * guide's interruptions): the one is hers, the other the backend's. A goodbye is on the
  * hand-over side by name: read as a greeting under "do not", a goodnight was answered by her
- * and the line stayed open.
+ * and the line stayed open. Work for a bot is talked through and agreed before it goes over:
+ * with every request on the list handed over as heard, the backend started the bot unasked —
+ * on the maintainer's calls (09-30 to 10-03) five of nine threads were ones she chose to
+ * start, and four of those the user stopped or asked her to do herself — and told only to
+ * propose first, the backend still started it (gpt-6-luna, 5 of 6 in a backend-only eval, 10-04).
  */
 function delegation(): string {
   return `Delegation policy:
 Backend tools:
 - Ending the call: hangs up the line — only the backend can, so a goodbye, or a hang-up they ask for, is handed over rather than answered.
-- Background work: hands a job to a bot, passes words on, stops or changes a job, answers a bot's question, says how the work stands, puts what a job made on their screen.
+- Background work: hands a job to one of your bots — anything longer than a quick search or one command — passes words on, stops or changes a job, answers a bot's question, says how the work stands, puts what a job made on their screen.
 - Routines: jobs that start by themselves later.
 - Memory: keeps what the user tells you about themselves, and looks it up.
 - This computer and the web: runs a command, searches.
 
 Delegate to the backend when:
 - They say goodbye or good night, in whatever words, or want the call to end.
-- They ask for anything on that list, or change or stop work already asked for.
+- They agree to give work to a bot, or name the bot to give it to.
+- They ask for anything else on that list, or change or stop work already asked for.
 
 Do not delegate to the backend when:
 - They say hello, make small talk, or only want you to stop talking.
 - You can answer from the conversation or a result still current.
 - You need a brief clarification to understand the request.
+- They want work a bot would do and have not agreed to give it to one: talk it through first, ask what it needs, then ask whether to give it to the bot that fits.
 
 Delegate before giving an answer that depends on backend work. Do not guess the result while waiting.`;
+}
+
+/**
+ * The bots by name and line, as the backend reads them, so the work she talks through has
+ * someone to go to: without the names she could only hand a request over, and the backend
+ * chose the bot. How a job is started, carried on or read stays the backend's.
+ */
+function yourBots(roster: JobBot[]): string {
+  if (roster.length === 0) return "";
+  return `## Your bots
+
+Who background work goes to:
+${roster.map((bot) => `- ${bot.name} — ${rosterLine(bot)}`).join("\n")}`;
 }
 
 /**

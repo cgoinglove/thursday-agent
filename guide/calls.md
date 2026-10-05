@@ -45,7 +45,9 @@ in the browser, so the position still goes nowhere.
 
 She answers from what she knows about them, searches the web, runs a single command on their
 computer, and holds the conversation. Anything that takes longer — a browser, a file to make,
-several steps — goes to a bot while the call carries on. She picks the bot and says who took it.
+several steps — goes to a bot while the call carries on. What the work still needs, she asks first,
+so the bot starts with all of it; work they did not ask her to hand over she proposes — which bot,
+and what it would do — and starts once they agree. She says who took it.
 
 While she is working, the line under her face says so. The microphone stays open: anything said
 meanwhile is heard and answered once she is done, so there is no need to repeat it.

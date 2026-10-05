@@ -1641,7 +1641,7 @@ test("both call prompts open as one Thursday: the voice gets the guide's delegat
     assert.match(on.text, /Prefer brief replies/);
     assert.match(
       on.text,
-      /\n\n## Always\n\nBackchannel policy: Use moderate backchannels\. .*\n\nInterruption policy: Stop speaking when the user interrupts\. Listen to what they say\.\n\nSpeak the language the user is speaking, [^\n]+\n\nDelegation policy:\nBackend tools:\n- Ending the call: hangs up the line — only the backend can, so a goodbye, or a hang-up they ask for, is handed over rather than answered\.\n(- [^\n]+\n){4}\nDelegate to the backend when:\n- They say goodbye or good night, in whatever words, or want the call to end\.\n(- [^\n]+\n)+\nDo not delegate to the backend when:\n- They say hello, [^\n]+\n(- [^\n]+\n)+\nDelegate before giving an answer that depends on backend work\. Do not guess the result while waiting\.\n\n## What you know about them\n/,
+      /\n\n## Always\n\nBackchannel policy: Use moderate backchannels\. .*\n\nInterruption policy: Stop speaking when the user interrupts\. Listen to what they say\.\n\nSpeak the language the user is speaking, [^\n]+\n\nDelegation policy:\nBackend tools:\n- Ending the call: hangs up the line — only the backend can, so a goodbye, or a hang-up they ask for, is handed over rather than answered\.\n(- [^\n]+\n){4}\nDelegate to the backend when:\n- They say goodbye or good night, in whatever words, or want the call to end\.\n(- [^\n]+\n)+\nDo not delegate to the backend when:\n- They say hello, [^\n]+\n(- [^\n]+\n)+\nDelegate before giving an answer that depends on backend work\. Do not guess the result while waiting\.\n\n## Your bots\n\nWho background work goes to:\n- Scout — Finds things out on the web\n\n## What you know about them\n/,
     );
     // Who she is to talk to sits right under the identity, character only: no stamp, no rule
     assert.match(
@@ -1653,8 +1653,13 @@ test("both call prompts open as one Thursday: the voice gets the guide's delegat
       on.text,
       /Backchannel policy: Use moderate backchannels\. Acknowledge naturally without competing with the main response\./,
     );
-    // What the backend can do, never how: no skills, connected tools or bots by name
+    // What the backend can do, never how: no skills or connected tools; the bots are named
+    // only so she can ask which one takes work she talks through
     assert.equal(/What bots can reach for|- Web:/.test(on.text), false);
+    assert.match(
+      on.text,
+      /- They want work a bot would do and have not agreed to give it to one: [^\n]+\n/,
+    );
     // Stopping her voice is hers, stopping a job the backend's
     assert.match(on.text, /or only want you to stop talking/);
     assert.match(on.text, /- people\/sam — Their brother, Sam \(2\)/);
@@ -1669,7 +1674,7 @@ test("both call prompts open as one Thursday: the voice gets the guide's delegat
       on.text,
       /\n\n## Earlier calls\n\nWhat was said on the last calls, newest last, each under when it was\. They are over, and this call is a new one: [^\n]+\n\n### [^\n]+\nuser: Book the dentist\.\nyou: Scout has it\.\n\n## Who they want you to be\n/,
     );
-    // The roster and the threads stay the backend's
+    // The threads stay the backend's
     assert.equal(
       /thread|you → |\bseen\b|works beside you/.test(on.text),
       false,
