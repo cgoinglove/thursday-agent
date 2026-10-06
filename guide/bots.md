@@ -70,6 +70,10 @@ of them: **Filter by label, bot or word** narrows them, each can be deleted, and
 removes every ended one. An ended thread is kept for three months, then deleted; one still running
 or waiting on an answer never is, and what a job made stays in **Settings › Files** either way.
 
+With threads at work, **Stop all** at the top of that list stops every one of them, after asking;
+a thread waiting on the user's answer is left as it is. Asking Thursday to stop all the work does
+the same.
+
 Pressing the pill opens the corner as a list; pressing a row opens the thread. **Esc** or the back
 arrow steps back one level, and the ✕ folds the room away.
 

@@ -302,6 +302,15 @@ function createThreadTools(callId: string | null | undefined): ToolSet {
       description: threadCancelSpec.description,
       inputSchema: threadCancelSpec.parameters,
       execute: async ({ thread }) => {
+        if (thread.trim().toLowerCase() === "all") {
+          const { cancelRunningThreads } = await import(
+            "@/features/bot/bot.runner"
+          );
+          const stopped = await cancelRunningThreads();
+          return stopped.length
+            ? { stopped: stopped.map((one) => one.label), status: "cancelled" }
+            : "No thread is at work.";
+        }
         const one = await pick(thread);
         if (typeof one === "string") return one;
         const { cancelThread } = await import("@/features/bot/bot.runner");

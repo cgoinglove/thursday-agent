@@ -64,8 +64,10 @@ export const threadStatusSpec = {
 
 export const threadCancelSpec = {
   description:
-    "Stop a thread now: its bot stops where it is. The thread is kept, and saying more to it later carries it on.",
-  parameters: z.object({ thread: THREAD_REF }),
+    'Stop a thread now: its bot stops where it is. The thread is kept, and saying more to it later carries it on. "all" stops every thread at work.',
+  parameters: z.object({
+    thread: z.string().describe('Its label or id, or "all".'),
+  }),
 };
 
 export const threadShowSpec = {

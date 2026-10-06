@@ -609,17 +609,43 @@ export async function cancelThread(id: string) {
     const thread = await findThread(id);
     if (!thread) publicError("No such thread.");
     if (thread.endedAt) publicError("That thread has already ended.");
-    await cancelRoom(id);
-    await updateThread(id, {
-      status: "cancelled",
-      outcome: null,
-      pending: null,
-      seen: true,
-      endedAt: new Date(),
-    });
-    await stopRuns(id);
-    await closeJobShell(id);
+    await cancelLocked(id);
   });
+}
+
+/**
+ * Stops every thread at work now, each as its own Stop would: the room's Stop all, and
+ * `thread_cancel` "all". A thread waiting on the user has nothing running and is left as it
+ * is. Returns the threads it stopped.
+ */
+export async function cancelRunningThreads(): Promise<
+  { id: string; label: string }[]
+> {
+  const stopped: { id: string; label: string }[] = [];
+  await Promise.all(
+    (await listRunningThreadIds()).map((id) =>
+      threadLock(id, async () => {
+        const thread = await findThread(id);
+        if (thread?.status !== "running") return;
+        await cancelLocked(id);
+        stopped.push({ id, label: thread.label });
+      }),
+    ),
+  );
+  return stopped;
+}
+
+async function cancelLocked(id: string) {
+  await cancelRoom(id);
+  await updateThread(id, {
+    status: "cancelled",
+    outcome: null,
+    pending: null,
+    seen: true,
+    endedAt: new Date(),
+  });
+  await stopRuns(id);
+  await closeJobShell(id);
 }
 export async function removeThread(id: string) {
   return threadLock(id, () => removeLockedThread(id));

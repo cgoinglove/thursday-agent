@@ -18,6 +18,7 @@ import {
 import {
   answerThread,
   askCompact,
+  cancelRunningThreads,
   cancelThread,
   removeFinishedThreads,
   removeThread,
@@ -201,6 +202,11 @@ export const cancelThreadAction = serverAction(async (ref: string) => {
   await cancelThread(thread.id);
   return { id: thread.id, label: thread.label, status: "cancelled" as const };
 });
+
+/** The room's Stop all: every thread at work stops, as each one's Stop would stop it. */
+export const cancelRunningThreadsAction = serverAction(async () => ({
+  stopped: await cancelRunningThreads(),
+}));
 
 /** Marks threads as read by the user: opened on screen. Their relays are settled with them (thread.query markSeen). */
 export const markSeenAction = serverAction(async (ids: string[]) => {

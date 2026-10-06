@@ -1,7 +1,13 @@
 "use client";
 
 import { format, isThisYear, isToday, isYesterday } from "date-fns";
-import { ChevronLeft, ChevronsRight, Loader2, Settings2 } from "lucide-react";
+import {
+  ChevronLeft,
+  ChevronsRight,
+  Loader2,
+  Settings2,
+  Square,
+} from "lucide-react";
 import {
   Fragment,
   type RefObject,
@@ -9,11 +15,14 @@ import {
   useMemo,
   useState,
 } from "react";
+import { queryKey } from "@/app/api/query-key";
 import { Button } from "@/components/ui/button";
+import { notify } from "@/components/ui/notify";
 import { ShinyText } from "@/components/ui/shiny-text";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { refusedWords } from "@/features/ai/model.schema";
+import { cancelRunningThreadsAction } from "@/features/bot/bot.action";
 import {
   type Bot,
   DEFAULT_BOT,
@@ -31,10 +40,13 @@ import { useAnswerThread } from "@/features/bot/components/thread-reply";
 import { RoutineMark } from "@/features/routine/components/routine-mark";
 import { openSettings } from "@/features/settings/settings.store";
 import { type DateLike, shortAgo, toDate } from "@/lib/date-like";
+import { useServerAction } from "@/lib/protocol/use-server-action";
 import { type ServerPages } from "@/lib/protocol/use-server-pages";
+import { revalidate } from "@/lib/protocol/use-server-route";
 import { cn, plainText, WAITING_INK } from "@/lib/utils";
 import {
   lastSaid,
+  screenActs,
   type ThreadView,
   useBotThreads,
   useRingingThreads,
@@ -65,19 +77,45 @@ export function useWaitingRows(): ThreadView[] {
 /** The room's two lists. */
 export type RoomTab = "now" | "history";
 
-/** The two lists as pills, drawn like a thread's bot tabs, and the fold beside them. */
+/**
+ * The two lists as pills, drawn like a thread's bot tabs, and the fold beside them; on Now, with
+ * threads at work, Stop all before the fold.
+ */
 export function ListHeader({
   tab,
   current,
+  working,
   onTab,
   onClose,
 }: {
   tab: RoomTab;
   /** Rows on Now. */
   current: number;
+  /** Threads at work on Now: what Stop all stops. */
+  working: number;
   onTab: (tab: RoomTab) => void;
   onClose: () => void;
 }) {
+  const [stopAll, stopping] = useServerAction(cancelRunningThreadsAction, {
+    onOk: ({ stopped }) => {
+      revalidate(queryKey.threads);
+      for (const one of stopped)
+        screenActs.announce({ kind: "stopped", id: one.id, label: one.label });
+    },
+  });
+  const askStopAll = async () => {
+    const confirmed = await notify.confirm({
+      title:
+        working === 1
+          ? "Stop the thread at work?"
+          : `Stop the ${working} threads at work?`,
+      description:
+        "Each bot stops where it is. The threads are kept, and saying more to one carries it on. A thread waiting on your answer is left as it is.",
+      okText: "Stop all",
+      destructive: true,
+    });
+    if (confirmed) stopAll();
+  };
   return (
     <div className="flex items-center gap-2 pt-3 pr-3.5 pb-1.5 pl-2.5">
       <Tabs
@@ -100,6 +138,19 @@ export function ListHeader({
         </TabsList>
       </Tabs>
       <span className="flex-1" />
+      {tab === "now" && working > 0 && (
+        <Button
+          type="button"
+          size="sm"
+          variant="ghost"
+          loading={stopping}
+          onClick={askStopAll}
+          className="h-7 shrink-0 gap-1.5 rounded-full px-2.5 text-[12px]"
+        >
+          {!stopping && <Square className="size-2.5 fill-current" />}
+          Stop all
+        </Button>
+      )}
       <FoldButton onClick={onClose} />
     </div>
   );

@@ -154,7 +154,11 @@ function fromArgs(
   if (name === TOOL_NAMES.thread_answer)
     return bot ? `Answering ${bot}` : "Answering that";
   if (name === TOOL_NAMES.thread_cancel)
-    return label ? `Stopping ${label}` : "Stopping that";
+    return label?.toLowerCase() === "all"
+      ? "Stopping all the work"
+      : label
+        ? `Stopping ${label}`
+        : "Stopping that";
   if (name === TOOL_NAMES.thread_seen)
     return label ? `Marking ${label} as read` : "Marking that as read";
   if (name === TOOL_NAMES.thread_show)

@@ -473,6 +473,9 @@ export const BotRoom = memo(function BotRoom() {
               <ListHeader
                 tab={tab}
                 current={now.length}
+                working={
+                  now.filter((entry) => entry.status === "working").length
+                }
                 onTab={setTab}
                 onClose={close}
               />

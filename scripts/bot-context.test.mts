@@ -2287,6 +2287,85 @@ test("cancellation drains tools and preserves the participant on follow-up", asy
   assert.equal(botBrowserSession(id, "Beta"), botBrowserSession(id, " beta "));
 });
 
+test("Stop all stops every thread at work and leaves one waiting on the user", async () => {
+  plans.set("Alpha", [
+    () =>
+      call(T.bash, {
+        command: "sleep 5; printf FIRST_AT_WORK",
+        description: "Work that runs until stopped.",
+      }),
+    () =>
+      call(T.bash, {
+        command: "sleep 5; printf SECOND_AT_WORK",
+        description: "Work that runs until stopped.",
+      }),
+  ]);
+  plans.set("Beta", [() => ask("Thursday", "Which size?")]);
+  const asking = await startThread({
+    bot: "Beta",
+    request: "Ask first",
+    label: "Asks",
+    from: "user",
+  });
+  await waitFor(asking, "waiting");
+  const first = await startThread({
+    bot: "Alpha",
+    request: "Work one",
+    label: "Work one",
+    from: "user",
+  });
+  const second = await startThread({
+    bot: "Alpha",
+    request: "Work two",
+    label: "Work two",
+    from: "user",
+  });
+  const until = Date.now() + 2000;
+  for (const [id, mark] of [
+    [first, "_AT_WORK"],
+    [second, "_AT_WORK"],
+  ] as const)
+    while (
+      !(await rowsOf(id)).some((row) =>
+        JSON.stringify(row.content).includes(mark),
+      )
+    ) {
+      assert.ok(Date.now() < until);
+      await new Promise((resolve) => setTimeout(resolve, 5));
+    }
+
+  const { loadTools } = await import("../features/ai/load-tools.ts");
+  const tools = await loadTools({ target: "thursday" });
+  const options = { toolCallId: "all", messages: [], context: {} };
+  const stopped = (await tools[T.thread_cancel].execute!(
+    { thread: "all" },
+    options,
+  )) as { stopped: string[]; status: string };
+  // Every thread at work, whichever test left it running
+  assert.ok(stopped.stopped.includes("Work one"));
+  assert.ok(stopped.stopped.includes("Work two"));
+  assert.ok(!stopped.stopped.includes("Asks"));
+  const { listRunningThreadIds } = await import(
+    "../features/bot/thread.query.ts"
+  );
+  assert.deepEqual(await listRunningThreadIds(), []);
+  assert.equal((await findThread(first))?.status, "cancelled");
+  assert.equal((await findThread(second))?.status, "cancelled");
+  assert.equal((await findThread(asking))?.status, "waiting");
+  for (const id of [first, second])
+    assert.ok(
+      (await listRoomWork(id)).every(
+        (row) => row.state === "done" || row.state === "cancelled",
+      ),
+    );
+  // Nothing at work: said, not an empty success
+  assert.equal(
+    await tools[T.thread_cancel].execute!({ thread: "ALL" }, options),
+    "No thread is at work.",
+  );
+  await cancelThread(asking);
+});
+
 test("compaction and an arriving message preserve the same inbox on resume", async () => {
   plans.set("Alpha", [() => text("Before compaction")]);
   const id = await startThread({
