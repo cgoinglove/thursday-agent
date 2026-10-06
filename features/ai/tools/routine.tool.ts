@@ -1,13 +1,15 @@
-import { tool } from "ai";
+import { type ToolSet, tool } from "ai";
 import * as z from "zod";
 import { PROMPT_LINE, ROUTINE } from "@/config";
 import { TOOL_NAMES } from "@/features/ai/tools/tool-name";
 import { listJobBots } from "@/features/bot/bot.query";
+import { findThread } from "@/features/bot/thread.query";
 import {
   createRoutine,
   deleteRoutine,
   listRoutines,
   resolveRoutine,
+  setRoutineWatch,
   updateRoutine,
 } from "@/features/routine/routine.query";
 import {
@@ -17,6 +19,7 @@ import {
   RoutineScheduleSchema,
   scheduleText,
 } from "@/features/routine/routine.schema";
+import { runWatch } from "@/features/routine/routine.watch";
 import { toDate, whenOf } from "@/lib/date-like";
 import { isPublicError } from "@/lib/public-error";
 import { clip } from "@/lib/utils";
@@ -208,6 +211,46 @@ export function createRoutineTools() {
         const changed = await updateRoutine(one.id, patch).catch(refusal);
         if (typeof changed === "string") return changed;
         return changed ? told(changed) : await noSuchRoutine(args.routine);
+      },
+    }),
+  };
+}
+
+/**
+ * `routine_watch`: held by the bot a routine's run belongs to, in that run alone (load-tools),
+ * so a routine is watched only by a command its own bot wrote while doing its job. The command
+ * is run once as it is set, and a failing one is not kept.
+ */
+export async function createRoutineWatchTool(
+  bot: string,
+  threadId: string | null,
+): Promise<ToolSet> {
+  const thread = threadId ? await findThread(threadId) : undefined;
+  const routineId = thread?.routineId;
+  if (!routineId || thread.bot !== bot) return {};
+  return {
+    [TOOL_NAMES.routine_watch]: tool({
+      description:
+        "Set what this routine watches: a shell command run at each of its starts that prints what the routine waits on — a price, the free slots, whether a page changed — and prints the same while nothing worth a run has changed. A start whose command prints what it printed last opens no run and calls no model. The command runs once now, and what it prints comes back.",
+      inputSchema: z.object({
+        command: z
+          .string()
+          .nullish()
+          .describe(
+            "As bash runs it in the workspace. Empty stops watching, and every start opens a run.",
+          ),
+      }),
+      execute: async ({ command }) => {
+        const watch = command?.trim();
+        if (!watch) {
+          await setRoutineWatch(routineId, null);
+          return "It watches nothing now: every start opens a run.";
+        }
+        const looked = await runWatch(watch);
+        if ("failed" in looked)
+          return `Not set: it failed (${looked.failed}). Fix the command and set it again.`;
+        await setRoutineWatch(routineId, { command: watch, saw: looked.saw });
+        return `Set. It prints now:\n${looked.saw || "(nothing)"}\nA start opens a run only once that changes.`;
       },
     }),
   };

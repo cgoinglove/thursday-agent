@@ -781,8 +781,20 @@ export const BOT_WORK = {
  * - `max`       routines that can exist. Past it, making one is refused with the number.
  * - `minHours`  the shortest `every` interval. Lower starts more runs nobody watches.
  * - `runsShown` a routine's latest runs listed on its sheet; the rest are in Threads.
+ * - `watchMs`   how long a routine's watch (routine_watch) may run before it counts as failed,
+ *               which wakes its bot. The clock waits on it, so a longer one holds every
+ *               routine due after it by as much.
+ * - `watchChars` how much of what a watch prints is compared, kept and told to the bot. A
+ *               watch that prints more changes on what is cut off without anyone woken.
  */
-export const ROUTINE = { tickMs: 30_000, max: 12, minHours: 1, runsShown: 5 };
+export const ROUTINE = {
+  tickMs: 30_000,
+  max: 12,
+  minHours: 1,
+  runsShown: 5,
+  watchMs: 60_000,
+  watchChars: 2_000,
+};
 
 /**
  * Shipped skills a seed bot claims by name (PATHS.skills.default), because they are the tool

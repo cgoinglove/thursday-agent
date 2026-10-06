@@ -28,6 +28,7 @@ export const TOOL_NAMES = {
   thread_show: "thread_show",
   thread_seen: "thread_seen",
   routine: "routine",
+  routine_watch: "routine_watch",
   send_message: "send_message",
   thread_recall: "thread_recall",
 

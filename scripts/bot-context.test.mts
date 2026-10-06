@@ -3537,6 +3537,123 @@ test("the call makes, reads and removes a routine", async () => {
   );
 });
 
+test("a watched routine opens a run only when what its watch prints changes, or when it fails", async () => {
+  const { mkdir: makeDir } = await import("node:fs/promises");
+  const { routineTable } = await import("../database/tables.ts");
+  const { createRoutine, deleteRoutine, findRoutine } = await import(
+    "../features/routine/routine.query.ts"
+  );
+  const { startDueRoutines } = await import(
+    "../features/routine/routine.clock.ts"
+  );
+  const { loadTools } = await import("../features/ai/load-tools.ts");
+  const price = join(WORKSPACE, "scratch", "watched-price.txt");
+  await makeDir(join(price, ".."), { recursive: true });
+  await writeFile(price, "price: 180\n");
+  const command = "cat scratch/watched-price.txt";
+  const routine = await createRoutine({
+    bot: "alpha",
+    label: "Coat price",
+    request: "Tell me when the coat is under 150.",
+    schedule: { kind: "every", hours: 1 },
+  });
+  const due = () =>
+    database
+      .update(routineTable)
+      .set({ nextRunAt: new Date(Date.now() - 60_000) })
+      .where(eq(routineTable.id, routine.id));
+  const runs = async () => (await findRoutine(routine.id))!.runs;
+  // The prompt arrives as JSON: words are looked for as JSON writes them
+  const has = (prompt: string, words: string) =>
+    prompt.includes(JSON.stringify(words).slice(1, -1));
+  try {
+    // Its first run: the bot is told it can watch, and sets a watch, tried once as it is set
+    await due();
+    plans.set("Alpha", [
+      (prompt) => {
+        assert.ok(
+          prompt.includes("give the routine a watch with `routine_watch`"),
+        );
+        return call(T.routine_watch, {
+          command: "cat scratch/nothing-here.txt",
+        });
+      },
+      (prompt) => {
+        assert.ok(prompt.includes("Not set: it failed"));
+        return call(T.routine_watch, { command });
+      },
+      (prompt) => {
+        assert.ok(has(prompt, "It prints now:\nprice: 180"));
+        return text("Watching the price.");
+      },
+    ]);
+    await startDueRoutines();
+    const first = (await runs())[0];
+    await waitFor(first.id, "done");
+    assert.equal((await findRoutine(routine.id))?.watch, command);
+
+    // Due, nothing changed: no run, and the watch is marked as looked
+    await due();
+    await startDueRoutines();
+    assert.equal((await runs()).length, 1);
+    assert.ok((await findRoutine(routine.id))?.watchedAt);
+
+    // Changed: a run, told what changed
+    await writeFile(price, "price: 140\n");
+    await due();
+    plans.set("Alpha", [
+      (prompt) => {
+        assert.ok(
+          has(
+            prompt,
+            'opened this run because that changed — before: "price: 180"; now: "price: 140"',
+          ),
+        );
+        return text("It is 140 now.");
+      },
+    ]);
+    await startDueRoutines();
+    assert.equal((await runs()).length, 2);
+    await waitFor((await runs())[0].id, "done");
+
+    // Failed: a run, told to fix it
+    await rm(price);
+    await due();
+    plans.set("Alpha", [
+      (prompt) => {
+        assert.match(prompt, /which failed this time \(exit 1/);
+        return text("The page moved; the watch needs fixing.");
+      },
+    ]);
+    await startDueRoutines();
+    assert.equal((await runs()).length, 3);
+    await waitFor((await runs())[0].id, "done");
+
+    // Only the routine's own bot holds the tool, and only in its run
+    const inRun = await loadTools({
+      target: "bot",
+      bot: "Alpha",
+      thread: first.id,
+    });
+    assert.ok(T.routine_watch in inRun);
+    const other = await loadTools({
+      target: "bot",
+      bot: "Beta",
+      thread: first.id,
+    });
+    assert.ok(!(T.routine_watch in other));
+    const plain = await loadTools({
+      target: "bot",
+      bot: "Alpha",
+      thread: null,
+    });
+    assert.ok(!(T.routine_watch in plain));
+  } finally {
+    await deleteRoutine(routine.id);
+    await rm(price, { force: true });
+  }
+});
+
 test("a routine opens one thread when it is due, skips while its last run is open, and waits for its bot", async () => {
   const { routineTable } = await import("../database/tables.ts");
   const { createRoutine, deleteRoutine, findRoutine } = await import(

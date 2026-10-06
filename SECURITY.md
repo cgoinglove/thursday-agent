@@ -110,7 +110,10 @@ What the app does to keep that narrow:
   starts it at login. Such a job has the same shell,
   browser and sign-ins as one you watch; what it asks waits for an answer, and
   what it finishes is told by the computer's notification and, with a phone
-  connected, there.
+  connected, there. A routine's watch is a shell command its own bot wrote and
+  the app runs at each of the routine's times with no model and nobody looking
+  (`features/routine/routine.watch.ts`); it is set only from that bot's tool,
+  in that routine's run, and shows in that run's thread.
 - **It asks npm which version is newest, and installs nothing unasked.** When a
   browser opens the app, at most once a day, the server asks
   `registry.npmjs.org` for this package's newest version: the one request it

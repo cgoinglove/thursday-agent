@@ -454,14 +454,19 @@ export function buildThreadOpening(input: {
   routine?: ThreadRoutine | null;
 }): OpeningContent {
   if (input.routine) {
-    const { when, last } = input.routine;
+    const { when, last, watch } = input.routine;
     const before = last
       ? ` Its last run ended ${format(last.at, "yyyy-MM-dd HH:mm")}: ${clip(last.said, PROMPT_LINE.jobOutcome)}`
       : " This is its first run.";
+    const watched = !watch
+      ? ` When the job waits for something to change, give the routine a watch with \`${TOOL_NAMES.routine_watch}\`: a start that finds nothing changed then wakes nobody.`
+      : "failed" in watch
+        ? ` It watches with \`${watch.command}\`, which failed this time (${watch.failed}): fix it with \`${TOOL_NAMES.routine_watch}\`, or do the job without it.`
+        : ` It watches with \`${watch.command}\` and opened this run because that changed — before: ${watch.before === null ? "(nothing yet)" : `"${watch.before}"`}; now: "${watch.now}".`;
     return [
       {
         type: "text",
-        text: `You are ${input.bot}. A routine the user set up hands you this thread: it starts by itself, ${when}, and nobody is watching as it does.${before}`,
+        text: `You are ${input.bot}. A routine the user set up hands you this thread: it starts by itself, ${when}, and nobody is watching as it does.${before}${watched}`,
       },
       {
         type: "text",

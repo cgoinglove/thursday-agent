@@ -28,7 +28,7 @@ instead — and everything it did stays as rows.
 - `features/bot/thread.file.ts` — a note about a file to the thread that reported it: which
   thread, who reads it, what stops it.
 - `features/ai/prompts/bot.prompt.ts` — what a participant reads each turn, and its opening.
-- `features/routine/routine.clock.ts` — what starts a routine.
+- `features/routine/routine.clock.ts` — what starts a routine; its watch: `routine.watch.ts`.
 - `scripts/bot-context.test.mts` — the real runner, database and prompts, with scripted models.
 
 ## How it fits

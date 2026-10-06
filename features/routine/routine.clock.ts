@@ -1,6 +1,7 @@
 import { ROUTINE } from "@/config";
 import { findJobBot } from "@/features/bot/bot.query";
 import { startThread } from "@/features/bot/bot.runner";
+import type { ThreadRoutine } from "@/features/bot/bot.schema";
 import { markSeen } from "@/features/bot/thread.query";
 import { toDate } from "@/lib/date-like";
 import { logger } from "@/lib/logger";
@@ -11,12 +12,15 @@ import {
   latestRun,
   listDueRoutines,
   listUnseenRunIds,
+  noteWatched,
+  type RoutineRow as Row,
 } from "./routine.query";
 import {
   type RoutineInput,
   type RoutineRun,
   scheduleText,
 } from "./routine.schema";
+import { runWatch } from "./routine.watch";
 
 // What starts a routine. The clock only opens threads: from there a run is a job like any
 // other (bot.runner), so its questions, stops and result reach the user the way a job's do —
@@ -31,7 +35,10 @@ const isOpen = (run: RoutineRun | null | undefined) =>
  * routine nobody opened are marked seen first: the run starting now stands in for them, so
  * a routine left alone for a month is one unread result and not thirty.
  */
-async function open(routine: RoutineInput & { id: string }): Promise<string> {
+async function open(
+  routine: RoutineInput & { id: string },
+  watch: ThreadRoutine["watch"] = null,
+): Promise<string> {
   const last = await latestRun(routine.id);
   await markSeen(await listUnseenRunIds(routine.id));
   return startThread({
@@ -46,7 +53,33 @@ async function open(routine: RoutineInput & { id: string }): Promise<string> {
         last?.status === "done" && last.outcome
           ? { at: toDate(last.updatedAt), said: last.outcome }
           : null,
+      watch,
     },
+  });
+}
+
+/**
+ * A watched routine's start (routine.watch): its watch runs, and a run opens only when what it
+ * prints differs from what opened the last one, or when it fails, which its bot is told to fix.
+ * Nothing changed: no run, no model, and the routine waits for its next time.
+ */
+async function startWatched(row: Row & { watch: string }): Promise<void> {
+  const looked = await runWatch(row.watch);
+  if ("failed" in looked) {
+    await noteWatched(row.id);
+    await open(row, { command: row.watch, failed: looked.failed });
+    return;
+  }
+  if (looked.saw === row.watchSaw) {
+    await noteWatched(row.id);
+    logger.info(`routine "${row.label}": its watch saw no change`);
+    return;
+  }
+  await noteWatched(row.id, looked.saw);
+  await open(row, {
+    command: row.watch,
+    now: looked.saw,
+    before: row.watchSaw,
   });
 }
 
@@ -73,7 +106,8 @@ export async function startDueRoutines(now = new Date()) {
       logger.info(`routine "${row.label}" skipped: its last run is still open`);
       continue;
     }
-    await open(row).catch((cause) =>
+    const { watch } = row;
+    await (watch ? startWatched({ ...row, watch }) : open(row)).catch((cause) =>
       logger.error(`routine "${row.label}" could not start`, cause),
     );
   }

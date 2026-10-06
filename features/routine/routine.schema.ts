@@ -88,6 +88,10 @@ const RoutineSchema = RoutineInputSchema.extend({
   id: z.string(),
   enabled: z.boolean(),
   nextRunAt: DateLikeSchema,
+  /** The command its bot watches with (routine_watch); null when every start opens a run. */
+  watch: z.string().nullable(),
+  /** When the watch last ran at a start. */
+  watchedAt: DateLikeSchema.nullable(),
   /** Newest first, at most `ROUTINE.runsShown`. */
   runs: z.array(RoutineRunSchema),
 });

@@ -22,6 +22,7 @@ import {
 const changed = () => appEvents.emit({ type: "routines" });
 
 type Row = typeof routineTable.$inferSelect;
+export type RoutineRow = Row;
 
 /** Newest first. `limit` is a routine's sheet; the clock asks for the one latest. */
 async function runsOf(id: string, limit: number): Promise<RoutineRun[]> {
@@ -39,7 +40,7 @@ async function runsOf(id: string, limit: number): Promise<RoutineRun[]> {
 }
 
 const withRuns = async (row: Row): Promise<Routine> => {
-  const { createdAt: _, ...routine } = row;
+  const { createdAt: _, watchSaw: __, ...routine } = row;
   return { ...routine, runs: await runsOf(row.id, ROUTINE.runsShown) };
 };
 
@@ -188,6 +189,34 @@ export async function claimRoutine(row: Row, now: Date): Promise<boolean> {
     .returning({ id: routineTable.id });
   if (claimed.length) changed();
   return claimed.length > 0;
+}
+
+/**
+ * Sets what the routine watches (routine_watch), with what it printed as it was set: the next
+ * start opens a run only once that differs. Null watches nothing, and every start opens a run.
+ */
+export async function setRoutineWatch(
+  id: string,
+  watch: { command: string; saw: string } | null,
+): Promise<void> {
+  await database
+    .update(routineTable)
+    .set({
+      watch: watch?.command ?? null,
+      watchSaw: watch?.saw ?? null,
+      watchedAt: watch ? new Date() : null,
+    })
+    .where(eq(routineTable.id, id));
+  changed();
+}
+
+/** That the watch ran at a start; `saw` when what it printed opened a run, and is kept to compare with. */
+export async function noteWatched(id: string, saw?: string): Promise<void> {
+  await database
+    .update(routineTable)
+    .set({ watchedAt: new Date(), ...(saw !== undefined && { watchSaw: saw }) })
+    .where(eq(routineTable.id, id));
+  changed();
 }
 
 /** The latest run, whatever became of it. */

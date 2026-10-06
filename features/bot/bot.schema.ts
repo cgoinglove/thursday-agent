@@ -314,6 +314,11 @@ export type ThreadRoutine = {
   /** "Daily 09:00 · Mon–Fri" (routine.schema scheduleText). */
   when: string;
   last: { at: Date; said: string } | null;
+  /** Why a watched routine opened this run (routine.clock): what its watch printed now and before, or how it failed. */
+  watch?:
+    | { command: string; now: string; before: string | null }
+    | { command: string; failed: string }
+    | null;
 };
 
 /** One of a bot's other threads, as its own prompt lists it (thread.query listBotWork). */

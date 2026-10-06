@@ -125,6 +125,7 @@ const TOOL_ICONS: Partial<Record<string, LucideIcon>> = {
   [TOOL_NAMES.check_mail]: Mail,
   [TOOL_NAMES.end_call]: PhoneOff,
   [TOOL_NAMES.routine]: RoutineMark,
+  [TOOL_NAMES.routine_watch]: RoutineMark,
 };
 
 export const toolIcon = (name: string): LucideIcon =>

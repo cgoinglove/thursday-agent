@@ -320,6 +320,13 @@ Each run opens an ordinary thread, marked with a repeat sign, and the bot is tol
 answer, so "what came since last time" works. A routine's row opens its settings and latest runs;
 **Run now** starts one at once, unless the last run is still open.
 
+A routine that waits for something — "tell me when the coat is under 150", "when a visa slot opens"
+— can be given a **watch** by its own bot, during one of its runs: a command that prints what it
+waits on. At each later time only that command runs, and a run opens only when what it prints has
+changed since the last run, so a check that finds nothing new costs no model and wakes nobody. A
+watch that fails opens a run, and the bot is told to fix it. **Run now** always opens a run. The
+bot's thread shows the command it set, and setting the watch again, or to nothing, changes it.
+
 - If the last run is still working or waiting when the next time comes, that time is skipped.
 - A run the app has to stop — a model that broke twice, a provider that refused, a step limit, the
   app restarting — ends there instead of waiting on **Continue**: it shows as stopped, its thread

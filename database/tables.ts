@@ -584,6 +584,15 @@ export const routineTable = sqliteTable(
     enabled: int("enabled", { mode: "boolean" }).notNull().default(true),
     /** The start it is waiting for; moved on before a run opens, so one tick starts it once. */
     nextRunAt: int("next_run_at", { mode: "timestamp" }).notNull(),
+    /**
+     * A shell command its bot set (routine_watch): run at each start, and a run opens only when
+     * what it prints differs from `watchSaw`, or when it fails. Null: every start opens a run.
+     */
+    watch: text("watch"),
+    /** What `watch` printed when it was set or last opened a run. */
+    watchSaw: text("watch_saw"),
+    /** When `watch` last ran at a start, whether or not a run opened. */
+    watchedAt: int("watched_at", { mode: "timestamp" }),
     createdAt: int("created_at", { mode: "timestamp" })
       .notNull()
       .$defaultFn(() => new Date()),
