@@ -92,10 +92,15 @@ const RoutineSchema = RoutineInputSchema.extend({
   watch: z.string().nullable(),
   /** When the watch last ran at a start. */
   watchedAt: DateLikeSchema.nullable(),
+  /** What it found then; null until it has run at a start. */
+  watchLast: z.enum(["same", "changed", "failed"]).nullable(),
   /** Newest first, at most `ROUTINE.runsShown`. */
   runs: z.array(RoutineRunSchema),
 });
 export type Routine = z.infer<typeof RoutineSchema>;
+
+/** What a routine's watch found at a start (routine.clock): the same, a change, or a failure. */
+export type WatchLast = NonNullable<Routine["watchLast"]>;
 
 /** A weekday's short name, Monday first as `WEEKDAYS` counts them. */
 export const DAY_NAMES = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];

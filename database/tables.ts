@@ -26,7 +26,10 @@ import {
   MCPToolInfo,
 } from "@/features/connectors/mcp.schema";
 import type { MemorySource } from "@/features/memory/memory.schema";
-import type { RoutineSchedule } from "@/features/routine/routine.schema";
+import type {
+  RoutineSchedule,
+  WatchLast,
+} from "@/features/routine/routine.schema";
 import type { CallTurn } from "@/features/thursday/thursday.schema";
 
 /** Workers that background jobs are delegated to. */
@@ -593,6 +596,8 @@ export const routineTable = sqliteTable(
     watchSaw: text("watch_saw"),
     /** When `watch` last ran at a start, whether or not a run opened. */
     watchedAt: int("watched_at", { mode: "timestamp" }),
+    /** What that last look found: the same, a change (a run opened), or a failure (a run opened). Null until one. */
+    watchLast: text("watch_last").$type<WatchLast>(),
     createdAt: int("created_at", { mode: "timestamp" })
       .notNull()
       .$defaultFn(() => new Date()),

@@ -325,7 +325,10 @@ A routine that waits for something — "tell me when the coat is under 150", "wh
 waits on. At each later time only that command runs, and a run opens only when what it prints has
 changed since the last run, so a check that finds nothing new costs no model and wakes nobody. A
 watch that fails opens a run, and the bot is told to fix it. **Run now** always opens a run. The
-bot's thread shows the command it set, and setting the watch again, or to nothing, changes it.
+bot's thread shows the command it set. In **Settings › Routines** a watched routine's row says what
+its last look found — no change, changed, or watch failed — and when; its sheet shows the command
+under **Watch**, and **Stop watching** (after asking) takes it off, so every start opens a run again
+until the bot sets one.
 
 - If the last run is still working or waiting when the next time comes, that time is skipped.
 - A run the app has to stop — a model that broke twice, a provider that refused, a step limit, the

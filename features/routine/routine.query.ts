@@ -13,6 +13,7 @@ import {
   type RoutineRun,
   type RoutineSchedule,
   sameSchedule,
+  type WatchLast,
 } from "./routine.schema";
 
 // Routines and the threads they opened. A run is an ordinary thread carrying `routine_id`;
@@ -205,16 +206,25 @@ export async function setRoutineWatch(
       watch: watch?.command ?? null,
       watchSaw: watch?.saw ?? null,
       watchedAt: watch ? new Date() : null,
+      watchLast: null,
     })
     .where(eq(routineTable.id, id));
   changed();
 }
 
-/** That the watch ran at a start; `saw` when what it printed opened a run, and is kept to compare with. */
-export async function noteWatched(id: string, saw?: string): Promise<void> {
+/** That the watch ran at a start and what it found; `saw`, what a change printed, is kept to compare with. */
+export async function noteWatched(
+  id: string,
+  found: WatchLast,
+  saw?: string,
+): Promise<void> {
   await database
     .update(routineTable)
-    .set({ watchedAt: new Date(), ...(saw !== undefined && { watchSaw: saw }) })
+    .set({
+      watchedAt: new Date(),
+      watchLast: found,
+      ...(saw !== undefined && { watchSaw: saw }),
+    })
     .where(eq(routineTable.id, id));
   changed();
 }

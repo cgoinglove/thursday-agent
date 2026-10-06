@@ -66,16 +66,16 @@ async function open(
 async function startWatched(row: Row & { watch: string }): Promise<void> {
   const looked = await runWatch(row.watch);
   if ("failed" in looked) {
-    await noteWatched(row.id);
+    await noteWatched(row.id, "failed");
     await open(row, { command: row.watch, failed: looked.failed });
     return;
   }
   if (looked.saw === row.watchSaw) {
-    await noteWatched(row.id);
+    await noteWatched(row.id, "same");
     logger.info(`routine "${row.label}": its watch saw no change`);
     return;
   }
-  await noteWatched(row.id, looked.saw);
+  await noteWatched(row.id, "changed", looked.saw);
   await open(row, {
     command: row.watch,
     now: looked.saw,

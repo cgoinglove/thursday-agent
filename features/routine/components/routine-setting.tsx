@@ -6,6 +6,7 @@ import {
   Check,
   ChevronDown,
   ChevronRight,
+  Eye,
   Loader2,
   MoreHorizontal,
   Play,
@@ -47,7 +48,7 @@ import {
   SettingSkeleton,
 } from "@/features/settings/components/setting-ui";
 import { useSettingsStore } from "@/features/settings/settings.store";
-import { whenOf } from "@/lib/date-like";
+import { shortAgo, whenOf } from "@/lib/date-like";
 import { useServerAction } from "@/lib/protocol/use-server-action";
 import { revalidate, useServerRoute } from "@/lib/protocol/use-server-route";
 import { cn, plainText, WAITING_INK } from "@/lib/utils";
@@ -55,6 +56,7 @@ import {
   createRoutineAction,
   deleteRoutineAction,
   runRoutineNowAction,
+  stopWatchingAction,
   updateRoutineAction,
 } from "../routine.action";
 import {
@@ -248,6 +250,19 @@ function Row({
             <RoutineMark className="size-3 shrink-0 text-muted-foreground" />
             <span className="truncate">{scheduleText(routine.schedule)}</span>
           </span>
+          {routine.watch && (
+            <span
+              className={cn(
+                "flex max-w-full items-center gap-1.5",
+                routine.watchLast === "failed"
+                  ? WAITING_INK
+                  : "text-muted-foreground",
+              )}
+            >
+              <Eye className="size-3 shrink-0" />
+              <span className="truncate">{watchedLine(routine)}</span>
+            </span>
+          )}
           <span className="max-w-full truncate text-muted-foreground">
             {routine.enabled ? `next ${whenOf(routine.nextRunAt)}` : "off"}
           </span>
@@ -269,6 +284,21 @@ function Row({
       </button>
     </div>
   );
+}
+
+/** What a routine's watch found last, and when: "no change · 12m ago". */
+function watchedLine(routine: Routine): string {
+  const found =
+    routine.watchLast === "same"
+      ? "no change"
+      : routine.watchLast === "changed"
+        ? "changed"
+        : routine.watchLast === "failed"
+          ? "watch failed"
+          : "watching";
+  if (!routine.watchedAt || !routine.watchLast) return found;
+  const ago = shortAgo(routine.watchedAt);
+  return `${found} · ${ago === "now" ? "just now" : `${ago} ago`}`;
 }
 
 type Draft = {
@@ -399,6 +429,19 @@ function RoutineSheet({
   });
   const [update] = useServerAction(updateRoutineAction, { onOk: refresh });
   const [remove] = useServerAction(deleteRoutineAction, { onOk: refresh });
+  const [unwatch, unwatching] = useServerAction(stopWatchingAction, {
+    onOk: refresh,
+  });
+  const confirmUnwatch = async () => {
+    if (!saved) return;
+    const confirmed = await notify.confirm({
+      title: "Stop watching?",
+      description: `Every start opens a run again. ${saved.bot} can set a watch again during one of its runs.`,
+      okText: "Stop watching",
+      destructive: true,
+    });
+    if (confirmed) await unwatch(saved.id).catch(() => {});
+  };
   const [runNow, starting] = useServerAction(runRoutineNowAction, {
     onOk: () => {
       refresh();
@@ -798,6 +841,41 @@ function RoutineSheet({
                       everything it needs.
                     </Hint>
                   </Field>
+
+                  {saved?.watch && (
+                    <div className="space-y-1.5 pt-1">
+                      <div className="flex h-6 items-center gap-2">
+                        <span className="flex-1 font-mono text-xs text-muted-foreground">
+                          Watch · set by {saved.bot}
+                        </span>
+                        <Button
+                          type="button"
+                          size="sm"
+                          variant="ghost"
+                          loading={unwatching}
+                          onClick={() => void confirmUnwatch()}
+                          className="h-7 rounded-full px-2.5 text-[12px]"
+                        >
+                          Stop watching
+                        </Button>
+                      </div>
+                      <pre className="rounded-lg bg-muted/50 p-2 font-mono text-[11.5px] leading-relaxed break-all whitespace-pre-wrap">
+                        {saved.watch}
+                      </pre>
+                      <Hint>
+                        Wakes {saved.bot} only when what this prints changes.
+                        {saved.watchedAt && saved.watchLast
+                          ? ` Last checked ${whenOf(saved.watchedAt)}: ${
+                              saved.watchLast === "same"
+                                ? "no change."
+                                : saved.watchLast === "changed"
+                                  ? "it changed, and a run opened."
+                                  : "it failed, and a run opened to fix it."
+                            }`
+                          : " Not checked at a start yet."}
+                      </Hint>
+                    </div>
+                  )}
 
                   {saved && (
                     <div className="pt-1">

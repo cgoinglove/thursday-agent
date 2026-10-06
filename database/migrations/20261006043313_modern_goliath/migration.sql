@@ -1,0 +1,1 @@
+ALTER TABLE `routine` ADD `watch_last` text;

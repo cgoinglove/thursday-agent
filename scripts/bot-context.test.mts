@@ -3597,6 +3597,7 @@ test("a watched routine opens a run only when what its watch prints changes, or 
     await startDueRoutines();
     assert.equal((await runs()).length, 1);
     assert.ok((await findRoutine(routine.id))?.watchedAt);
+    assert.equal((await findRoutine(routine.id))?.watchLast, "same");
 
     // Changed: a run, told what changed
     await writeFile(price, "price: 140\n");
@@ -3614,6 +3615,7 @@ test("a watched routine opens a run only when what its watch prints changes, or 
     ]);
     await startDueRoutines();
     assert.equal((await runs()).length, 2);
+    assert.equal((await findRoutine(routine.id))?.watchLast, "changed");
     await waitFor((await runs())[0].id, "done");
 
     // Failed: a run, told to fix it
@@ -3627,7 +3629,17 @@ test("a watched routine opens a run only when what its watch prints changes, or 
     ]);
     await startDueRoutines();
     assert.equal((await runs()).length, 3);
+    assert.equal((await findRoutine(routine.id))?.watchLast, "failed");
     await waitFor((await runs())[0].id, "done");
+
+    // Settings' Stop watching: no watch, and every start opens a run again
+    const { stopWatchingAction } = await import(
+      "../features/routine/routine.action.ts"
+    );
+    await stopWatchingAction(routine.id);
+    const stopped = await findRoutine(routine.id);
+    assert.equal(stopped?.watch, null);
+    assert.equal(stopped?.watchLast, null);
 
     // Only the routine's own bot holds the tool, and only in its run
     const inRun = await loadTools({
