@@ -36,8 +36,10 @@ type TelegramUser = {
 type TelegramFile = {
   file_id: string;
   file_size?: number;
-  /** A voice message's, as its sender's app set it. */
+  /** A voice message's or an audio file's, as its sender's app set it. */
   mime_type?: string;
+  /** An audio file's own name, where it has one. */
+  file_name?: string;
 };
 
 /** Telegram answered, and said no: its words, and the status it answered in. */
@@ -184,7 +186,15 @@ export function createTelegram(token: string): Channel {
             type: "",
             size: photo.file_size,
           }
-        : null;
+        : // An audio file is a file, as a document is: she can hand it to a bot to transcribe
+          message.audio
+          ? {
+              id: message.audio.file_id,
+              name: message.audio.file_name ?? `audio-${message.message_id}`,
+              type: message.audio.mime_type ?? "",
+              size: message.audio.file_size,
+            }
+          : null;
     return {
       kind: "message",
       chat: String(message.chat.id),
@@ -212,7 +222,7 @@ export function createTelegram(token: string): Channel {
               ),
           }
         : null,
-      unreadable: Boolean(message.audio || message.video),
+      unreadable: Boolean(message.video),
     };
   }
 

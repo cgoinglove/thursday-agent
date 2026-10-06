@@ -987,6 +987,28 @@ test("a voice message is read as words by the transcription model picked, and wi
     );
     assert.equal(transcribed, 1);
     assert.ok(sent.slice(from).some((one) => one.method === "getFile"));
+
+    // An audio file is a file: kept, its path to her, and never transcribed on its own
+    inbox.push({
+      update_id: updateId++,
+      message: {
+        message_id: updateId,
+        from: { id: 7, first_name: "Sam" },
+        chat: { id: 7, type: "private" },
+        caption: "the interview",
+        audio: {
+          file_id: "interview",
+          file_name: "interview.m4a",
+          mime_type: "audio/mp4",
+          file_size: 4,
+        },
+      },
+    });
+    await until(
+      () => /^the interview\n.*interview/.test(turns.at(-1)?.words ?? ""),
+      "the audio file reaches her as a file",
+    );
+    assert.equal(transcribed, 1);
   } finally {
     await removeConfig(MEDIA_MODEL_KEYS.transcription);
     await removeConfig("OPENAI_API_KEY");

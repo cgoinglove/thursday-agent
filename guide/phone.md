@@ -149,7 +149,7 @@ back.
   her as a picture with what was written with it, as in a call in writing; any other file she can
   hand to a bot. A voice message from Telegram or Discord is read as words by the transcription model
   picked in **Settings › Models**, which bills for it, and she answers in writing; with none picked
-  the chat says so. On Slack a recording arrives as a file. Videos are not read. Telegram hands
+  the chat says so. An audio file, and on Slack a recording, arrives as a file. Videos are not read. Telegram hands
   over files up to 20 MB, and the app takes up to 45 MB from any chat app; a file that does not come
   through is named in the chat.
 - **Files she names in an answer** are sent with it, the newest three. What does not go — a fourth,
