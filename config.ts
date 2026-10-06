@@ -984,10 +984,12 @@ export const BROWSER_IDLE = {
 
 /**
  * How long what the app kept of its own use stays before it clears it by itself
- * (instrumentation): an ended call with its turns, and a job that finished with
- * its messages. Nothing else grows without an end — every other table is a
- * standing list the user edits — and these two are the ones a daily driver writes
- * most: a ten-minute call is about 150 rows, a thirty-step job about 60 wider ones.
+ * (instrumentation): an ended call with its turns, a job that finished with its
+ * messages, and a bot's lesson with the text it held to put a change back (the
+ * change itself stays on disk). Nothing else grows without an end — every other
+ * table is a standing list the user edits — and calls and jobs are the ones a daily
+ * driver writes most: a ten-minute call is about 150 rows, a thirty-step job about 60
+ * wider ones.
  * - `forMs`  counted from when the call ended or the job did. A job still running
  *            or waiting on the user is never touched however old, and a job's
  *            finished work is not in these rows: it is in `artifacts/`, which

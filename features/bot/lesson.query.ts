@@ -1,4 +1,4 @@
-import { and, desc, eq, isNull } from "drizzle-orm";
+import { and, desc, eq, isNull, lt } from "drizzle-orm";
 import { appEvents } from "@/app/api/events/app-event.server";
 import { BOT_LESSON } from "@/config";
 import { database } from "@/database/db";
@@ -105,6 +105,19 @@ export async function markLessonUndone(id: number): Promise<void> {
     .set({ undoneAt: new Date() })
     .where(eq(lesson.id, id));
   changed();
+}
+
+/**
+ * Lessons last changed before `before` (config HISTORY_KEEP), with the text they hold of each
+ * file. What they changed stays on disk as it is; only putting it back goes with them.
+ */
+export async function deleteOldLessons(before: Date): Promise<number> {
+  const gone = await database
+    .delete(lesson)
+    .where(lt(lesson.updatedAt, before))
+    .returning({ id: lesson.id });
+  if (gone.length) changed();
+  return gone.length;
 }
 
 /** Whether two holds of one thing are the same files with the same text. */

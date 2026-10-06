@@ -771,6 +771,16 @@ test("what a bot keeps is noted from the disk, folded within a job, and put back
       (await listLessons({ bot: "Delta" })).map((one) => one.name),
       ["busy.md", "kept.md", "price-compare", "shop.md"],
     );
+    // Cleared by age with the jobs: the record goes, what the bot keeps stays on disk
+    const { deleteOldLessons } = await import(
+      "../features/bot/lesson.query.ts"
+    );
+    assert.ok((await deleteOldLessons(new Date(Date.now() + 60_000))) >= 4);
+    assert.deepEqual(await listLessons({ bot: "Delta" }), []);
+    assert.equal(
+      await readFile(join(WORKSPACE, memory, "kept.md"), "utf8"),
+      "Old way\n",
+    );
   } finally {
     await rm(join(WORKSPACE, "bots/Delta"), { recursive: true, force: true });
   }

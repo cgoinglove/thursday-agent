@@ -134,17 +134,22 @@ export async function boot() {
   void keepCallMemory();
 
   // And what the app kept of its own use goes by age as well (config HISTORY_KEEP):
-  // an ended call with its turns, a job that is over with its messages. After
-  // sweepThreads and sweepCalls, so nothing the last process left open is counted
-  // as finished. A job's results are not in these rows — they are in `artifacts/`.
+  // an ended call with its turns, a job that is over with its messages, a bot's lesson
+  // with the text it could put back. After sweepThreads and sweepCalls, so nothing the
+  // last process left open is counted as finished. A job's results are not in these
+  // rows — they are in `artifacts/` — nor is what a bot kept, which stays on disk.
   const { removeFinishedThreads } = await import("@/features/bot/bot.runner");
+  const { deleteOldLessons } = await import("@/features/bot/lesson.query");
   const sweepHistory = () =>
     void (async () => {
       const before = new Date(Date.now() - HISTORY_KEEP.forMs);
       const calls = await deleteEndedCalls(before);
       const jobs = await removeFinishedThreads(before);
-      if (calls || jobs)
-        logger.info(`cleared ${calls} old call(s) and ${jobs} old job(s)`);
+      const lessons = await deleteOldLessons(before);
+      if (calls || jobs || lessons)
+        logger.info(
+          `cleared ${calls} old call(s), ${jobs} old job(s) and ${lessons} old lesson(s)`,
+        );
     })().catch((cause) => logger.error("sweep history", cause));
   sweepHistory();
   setInterval(sweepHistory, HISTORY_KEEP.sweepEveryMs).unref();
