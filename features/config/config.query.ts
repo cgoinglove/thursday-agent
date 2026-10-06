@@ -178,9 +178,11 @@ export async function configSecretValues(): Promise<string[]> {
     if (!value) return [];
     return CONFIG_ENTRIES[row.key]?.signIn ? textsOf(value) : [value];
   });
-  const fromEnv = CONFIG_KEYS.filter(isSecretKey).flatMap(
-    (key) => process.env[key]?.trim() || [],
-  );
+  const fromEnv = CONFIG_KEYS.filter(isSecretKey).flatMap((key) => {
+    const value = process.env[key]?.trim();
+    if (!value) return [];
+    return CONFIG_ENTRIES[key]?.signIn ? textsOf(value) : [value];
+  });
   return [...values, ...fromEnv];
 }
 

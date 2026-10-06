@@ -40,8 +40,9 @@ What the app does to keep that narrow:
   what goes to a model provider and what the app stores; it does not keep them
   from a bot. A command can still use one without printing it — send the `.env`
   somewhere, or print a key encoded or in pieces — and values under twelve
-  characters (`HIDDEN_SECRET_MIN`), the cookies of a kept sign-in and anything
-  else on disk the app did not put there are shown as they are.
+  characters (`HIDDEN_SECRET_MIN`), a connector's value that names a path on
+  this machine, the cookies of a kept sign-in and anything else on disk the app
+  did not put there are shown as they are.
 - **What a bot keeps for itself is shown, and can be put back.** A bot's own
   memory and skills are read into every later job of it, so a page that talked
   a bot into keeping an instruction would carry it on. Every change a bot's

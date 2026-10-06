@@ -1305,3 +1305,52 @@ test("a bot's shell hides the folder's key, every key and sign-in Settings keeps
     await mcp.deleteServer("hidden-local");
   }
 });
+
+test("a shell shows what only looks like a secret: the app's own variables and a path that exists; a key saved since is hidden at once, and a sign-in set in the environment by its tokens", async () => {
+  const { HIDDEN } = await import("../lib/sandbox.ts");
+  const { openWorkspace } = await import("../features/workspace/workspace.ts");
+  const shell = await openWorkspace();
+  const ownScript = "node --import tsx --test scripts/secrets.test.mts";
+  const access = "eyJenv.access-token-from-the-environment.sig";
+  process.env.npm_package_scripts_test_secrets = ownScript;
+  process.env.SOME_TOOL_TOKEN_PATH = home;
+  await mcp.upsertServer({
+    name: "with-a-folder",
+    config: {
+      command: "npx",
+      args: ["-y", "some-server"],
+      env: {
+        ALLOWED_DIRECTORY: home,
+        API_TOKEN: "tok_live_folder-server-0123",
+      },
+    },
+  });
+  try {
+    const shown = await shell.exec(
+      `printf '%s\\n' "${ownScript}" "${home}" tok_live_folder-server-0123`,
+    );
+    assert.ok(shown.stdout.includes(ownScript), "the app's own variable");
+    assert.ok(shown.stdout.includes(home), "a path that exists");
+    assert.ok(!shown.stdout.includes("tok_live_folder-server-0123"));
+
+    // Read once and kept: a key written since is hidden in the very next command
+    const fresh = "sk-ant-saved-after-the-cache-0123";
+    await config.writeConfig(ANTHROPIC, fresh);
+    assert.equal((await shell.exec(`printf ${fresh}`)).stdout, HIDDEN);
+
+    // A sign-in the environment sets is hidden by each token it holds
+    process.env[CHATGPT] = JSON.stringify({
+      access,
+      refresh: "rt_env-refresh-token-0123",
+    });
+    // The environment does not change while the app runs; a write is what reads it again
+    await config.writeConfig(DEFAULT_MODEL_KEY, "openai/gpt-shown-in-full");
+    assert.equal((await shell.exec(`printf ${access}`)).stdout, HIDDEN);
+  } finally {
+    delete process.env.npm_package_scripts_test_secrets;
+    delete process.env.SOME_TOOL_TOKEN_PATH;
+    delete process.env[CHATGPT];
+    await config.removeConfig(ANTHROPIC);
+    await mcp.deleteServer("with-a-folder");
+  }
+});

@@ -10,7 +10,7 @@ import {
   writeFile,
 } from "node:fs/promises";
 import { homedir } from "node:os";
-import { dirname, join, relative, resolve, sep } from "node:path";
+import { dirname, isAbsolute, join, relative, resolve, sep } from "node:path";
 import { appEvents } from "@/app/api/events/app-event.server";
 import {
   APP_DIR,
@@ -29,6 +29,7 @@ import { configSecretValues } from "@/features/config/config.query";
 import { connectorSecretValues } from "@/features/connectors/mcp.query";
 import { logger } from "@/lib/logger";
 import {
+  APP_OWN,
   createSandBox,
   type Sandbox,
   SECRET_NAME,
@@ -634,27 +635,59 @@ const FENCE: Record<string, string> = {
   ".npmrc": "recursive-install=false\n",
 };
 
+type Pinned = typeof globalThis & {
+  __storedSecrets?: { values: Promise<string[]> | null };
+};
+
+/**
+ * The secrets Settings and the connectors keep, read once and again only after one of them
+ * changes: every write of a key, a sign-in or a connector raises `config` or `mcp`, and the next
+ * command reads them anew. On globalThis, as every server-lifetime cache is, so a reload of this
+ * module neither reads twice nor subscribes twice.
+ */
+const stored = ((globalThis as Pinned).__storedSecrets ??= (() => {
+  const cache = { values: null as Promise<string[]> | null };
+  appEvents.subscribe((event) => {
+    if (event.type === "config" || event.type === "mcp") cache.values = null;
+  });
+  return cache;
+})());
+
+function storedSecrets(): Promise<string[]> {
+  stored.values ??= Promise.all([
+    configSecretValues(),
+    connectorSecretValues(),
+  ]).then(
+    ([config, connectors]) => [...config, ...connectors],
+    (cause) => {
+      stored.values = null;
+      throw cause;
+    },
+  );
+  return stored.values;
+}
+
 /**
  * The secrets the app holds, as a command could print them, for every shell to hide from what it
  * prints: the key `local.db`'s secrets are sealed with, which sits in plain text in the data
  * folder's `.env`; every key, token and sign-in Settings and the connectors keep; and what the
  * environment holds under a secret's name, which no shell is given (lib/sandbox SECRET_NAME) and
- * a command could still read from the file that set it. Read again for every command, so a key
- * entered a moment ago is hidden in the next.
+ * a command could still read from the file that set it — but for the app's own (APP_OWN). Not a
+ * value shorter than HIDDEN_SECRET_MIN, nor one naming a path that exists on this machine, which
+ * no credential does: a connector's folder or a tool's socket is shown as it is.
  */
 async function heldSecrets(): Promise<string[]> {
   const fromEnv = Object.entries(process.env).flatMap(([name, value]) =>
-    SECRET_NAME.test(name) && value ? [value] : [],
+    SECRET_NAME.test(name) && !APP_OWN.test(name) && value ? [value] : [],
   );
-  const all = [
-    ...encryptionKeyTexts(),
-    ...(await configSecretValues()),
-    ...(await connectorSecretValues()),
-    ...fromEnv,
-  ];
+  const all = [...encryptionKeyTexts(), ...(await storedSecrets()), ...fromEnv];
   return all
     .map((value) => value.trim())
-    .filter((value) => value.length >= HIDDEN_SECRET_MIN);
+    .filter(
+      (value) =>
+        value.length >= HIDDEN_SECRET_MIN &&
+        !(isAbsolute(value) && existsSync(value)),
+    );
 }
 
 export async function openWorkspace(): Promise<Sandbox> {

@@ -581,8 +581,9 @@ export const TOOL_OUTPUT = { max: 8_000, head: 5_500, tail: 1_500 };
 /**
  * The shortest secret hidden from what a shell prints (chars; workspace heldSecrets). A
  * connector's headers and env are sealed whole, plain values beside the credentials, and a
- * short one — `info`, a port, a folder's name — would be hidden everywhere it appears. Lower
- * hides more ordinary text; higher shows a short credential.
+ * short one — `info`, a port, a name — would be hidden everywhere it appears (one naming a
+ * path that exists is never hidden, however long). Lower hides more ordinary text; higher
+ * shows a short credential.
  */
 export const HIDDEN_SECRET_MIN = 12;
 
