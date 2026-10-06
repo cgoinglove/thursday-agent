@@ -13,7 +13,7 @@ export type AppEvent =
   | { type: "hello" }
   /** Signal: a thread changed (every write in thread.query and room.query). */
   | { type: "threads" }
-  /** Signal: a bot rewrote its own description (bot.query rewriteBotDescription). */
+  /** Signal: a bot rewrote its own description (bot.query rewriteBotDescription), or kept or put back a lesson (lesson.query). */
   | { type: "bots" }
   /** Signal: a routine was made, changed, removed, or moved on to its next time. */
   | { type: "routines" }

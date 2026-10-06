@@ -41,7 +41,7 @@ The first run lets you pick a few starter bots; more are ready in Settings › B
 
 A job ends in the thing you asked for and a short report. Anything longer than a few lines is a file in `artifacts/`. When only you can do something — sign in, choose between two real options — the bot sets it up, asks, and waits. It is told never to press Pay: a purchase stops on the last screen, left open for you. That is an instruction the model follows, not a lock ([SECURITY.md](../SECURITY.md)).
 
-Each bot keeps its own memory as files you can open from its page. When a job is done, each bot that worked in it looks back once and keeps what it learned about working, such as the way round a site that showed prices only in the local currency, so the next job like it goes straight through. A job that taught nothing leaves nothing.
+Each bot keeps its own memory as files you can open from its page. When a job is done, each bot that worked in it looks back once and keeps what it learned about working, such as the way round a site that showed prices only in the local currency, so the next job like it goes straight through. A job that taught nothing leaves nothing. What a bot kept shows at the end of the job and on its page, read from what changed on disk, and Undo puts any of it back.
 
 ## Jobs outlive the call
 

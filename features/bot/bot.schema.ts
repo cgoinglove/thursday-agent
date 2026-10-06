@@ -269,6 +269,41 @@ export type BotMemory = {
   total: number;
 };
 
+/** What a bot keeps for itself: a file of its memory, or a skill of its own. */
+export type LessonKind = "memory" | "skill";
+
+/**
+ * The files one thing a bot keeps held at one moment, by workspace path: their text, and the
+ * paths it holds that are not text the app keeps (a picture, a file past BOT_LESSON.fileChars).
+ */
+export type KeptFiles = { files: Record<string, string>; unheld: string[] };
+
+/**
+ * One thing a bot kept for itself while it worked, as the screen shows it (bot.lesson): what
+ * changed, in which job, and whether it was put back.
+ */
+export type BotLesson = {
+  id: number;
+  bot: string;
+  /** The job it was kept in, which may since be cleared; its label still says which. */
+  threadId: string | null;
+  threadLabel: string;
+  kind: LessonKind;
+  /** The memory file's name, or the skill's folder. */
+  name: string;
+  /** What it is about: a memory file's first line, a skill's description. */
+  line: string;
+  /** What it did: wrote it new, changed it, or removed it. */
+  change: "added" | "changed" | "removed";
+  /** Lines added and taken out, over the text files it holds. */
+  added: number;
+  removed: number;
+  /** The memory file or the skill's SKILL.md as the job left it (as it was, when removed), clipped. */
+  text: string;
+  at: Date;
+  undoneAt: Date | null;
+};
+
 /**
  * What a thread opened by a routine is told about it (features/routine): which one, when
  * it starts, and how its last run ended, so "since last time" means something.

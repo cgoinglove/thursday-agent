@@ -94,6 +94,14 @@ export const queryKey = {
    */
   thread: (id: string) => ({ url: "/api/bot/thread", query: { id } }),
   /**
+   * BotLesson[]: what bots kept for themselves, one job's or one bot's (bot.lesson). Under
+   * `threads`, so the job's lessons arrive as its bots look back.
+   */
+  lessons: (by: { thread: string } | { bot: string }) => ({
+    url: "/api/bot/thread/lessons",
+    query: by,
+  }),
+  /**
    * FileNote: where a note about a file open on screen goes, and the version the file is at
    * (bot/thread.file). Under `threads`, so a thread moving re-reads it; the `files` signal
    * re-reads the bare key.

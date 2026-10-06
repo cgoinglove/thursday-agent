@@ -42,6 +42,13 @@ What the app does to keep that narrow:
   somewhere, or print a key encoded or in pieces — and values under twelve
   characters (`HIDDEN_SECRET_MIN`), the cookies of a kept sign-in and anything
   else on disk the app did not put there are shown as they are.
+- **What a bot keeps for itself is shown, and can be put back.** A bot's own
+  memory and skills are read into every later job of it, so a page that talked
+  a bot into keeping an instruction would carry it on. Every change a bot's
+  command makes to them — a note, a skill it wrote or installed — is read from
+  the disk and shown at the end of the job and on the bot's page, where Undo puts
+  it back (`features/bot/bot.lesson.ts`). That shows such a change; it does not
+  stop one, nor a change made through anything but the bot's own tools.
 - **The file tool is fenced; the shell is not.** `write_file` refuses the app's
   own directory and the workspace root, and inside the workspace accepts only its
   folders (`features/workspace/workspace.ts`). A path outside the workspace is

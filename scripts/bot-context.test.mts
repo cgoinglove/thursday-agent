@@ -607,6 +607,21 @@ test("a bot that worked a job looks back once it is done, on the conversation it
     await readFile(kept, "utf8"),
     "Site search: the box is under Help (2026-10-01)\n",
   );
+  // What it kept is the job's lesson, told by the note's own first line (bot.lesson)
+  const { listLessons } = await import("../features/bot/lesson.query.ts");
+  const lessons = await listLessons({ thread: id });
+  assert.deepEqual(
+    lessons.map((one) => [one.bot, one.kind, one.name, one.line]),
+    [
+      [
+        "Alpha",
+        "memory",
+        "site-search.md",
+        "Site search: the box is under Help (2026-10-01)",
+      ],
+    ],
+  );
+  assert.equal(lessons[0]?.threadLabel, "Look back");
   // Nothing of it is written to the thread, whose answer stands
   assert.equal((await rowsOf(id)).length, rows);
   assert.equal((await findThread(id))?.outcome, "The answer.");
@@ -633,6 +648,132 @@ test("a bot that worked a job looks back once it is done, on the conversation it
   await waitFor(short, "done");
   await new Promise((resolve) => setTimeout(resolve, 100));
   assert.equal(plans.get("Alpha")?.length, 0);
+});
+
+test("what a bot keeps is noted from the disk, folded within a job, and put back only as the job left it", async () => {
+  const { existsSync } = await import("node:fs");
+  const { createWorkspaceTools } = await import(
+    "../features/ai/tools/workspace.tool.ts"
+  );
+  const { openWorkspace } = await import("../features/workspace/workspace.ts");
+  const { listLessons } = await import("../features/bot/lesson.query.ts");
+  const { undoLesson } = await import("../features/bot/bot.lesson.ts");
+  const { botMemoryFolder } = await import("../features/bot/bot.memory.ts");
+  const { BOT_MEMORY_LIMITS } = await import("../config.ts");
+  plans.set("Alpha", [() => text("Done.")]);
+  const id = await startThread({
+    bot: "Alpha",
+    request: "Learn",
+    label: "Learning",
+    from: "user",
+  });
+  await waitFor(id, "done");
+  const shell = createWorkspaceTools(await openWorkspace(), {
+    write: true,
+    bot: "Delta",
+    thread: id,
+  });
+  const run = (command: string) =>
+    shell[T.bash].execute!(
+      { command },
+      { toolCallId: "kept", messages: [], context: {} },
+    );
+  const memory = botMemoryFolder("Delta");
+  const skill = "bots/Delta/.agents/skills/price-compare";
+  await rm(join(WORKSPACE, "bots/Delta"), { recursive: true, force: true });
+  try {
+    // A note written and changed again in one job: one lesson, written new
+    await run(
+      `mkdir -p ${memory} && printf 'Region first\\n' > ${memory}/shop.md`,
+    );
+    await run(`printf 'Region first, then currency\\n' > ${memory}/shop.md`);
+    // A write the memory limits take back was never kept
+    await run(
+      `head -c ${BOT_MEMORY_LIMITS.chars + 10} /dev/zero | tr '\\0' x > ${memory}/long.md`,
+    );
+    // A skill of its own, told by its description
+    await run(
+      `mkdir -p ${skill} && printf -- '---\\nname: price-compare\\ndescription: Compare unit prices across shops\\n---\\n# Steps\\n' > ${skill}/SKILL.md`,
+    );
+    const kept = await listLessons({ thread: id });
+    assert.deepEqual(
+      kept.map((one) => [one.kind, one.name, one.change, one.line]),
+      [
+        ["memory", "shop.md", "added", "Region first, then currency"],
+        ["skill", "price-compare", "added", "Compare unit prices across shops"],
+      ],
+    );
+    const [note, written] = kept as [(typeof kept)[0], (typeof kept)[0]];
+
+    // Changed since the job left it: left as it is
+    await writeFile(join(WORKSPACE, memory, "shop.md"), "Edited by hand\n");
+    await assert.rejects(undoLesson(note.id), /changed since/);
+    await writeFile(
+      join(WORKSPACE, memory, "shop.md"),
+      "Region first, then currency\n",
+    );
+    // Put back: what the job wrote new goes, a skill with its whole folder
+    assert.equal(await undoLesson(note.id), "Put back.");
+    assert.equal(existsSync(join(WORKSPACE, memory, "shop.md")), false);
+    assert.equal(await undoLesson(written.id), "Put back.");
+    assert.equal(existsSync(join(WORKSPACE, skill)), false);
+    await assert.rejects(undoLesson(written.id), /already put back/);
+    assert.ok((await listLessons({ thread: id })).every((one) => one.undoneAt));
+
+    // What the user wrote between commands is not the bot's; what it changed of it goes back
+    await writeFile(join(WORKSPACE, memory, "kept.md"), "Old way\n");
+    await run(`printf 'New way\\n' > ${memory}/kept.md`);
+    const changed = (await listLessons({ thread: id })).at(-1);
+    assert.deepEqual(
+      [changed?.name, changed?.change, changed?.added, changed?.removed],
+      ["kept.md", "changed", 1, 1],
+    );
+    await undoLesson(changed!.id);
+    assert.equal(
+      await readFile(join(WORKSPACE, memory, "kept.md"), "utf8"),
+      "Old way\n",
+    );
+    // Putting back is no lesson of its own
+    assert.equal((await listLessons({ thread: id })).length, 3);
+    // Two commands of one bot at once, in two jobs: a change made while the other runs is
+    // noted once, never taken for how things already stood
+    plans.set("Alpha", [() => text("Done.")]);
+    const other = await startThread({
+      bot: "Alpha",
+      request: "Meanwhile",
+      label: "Meanwhile",
+      from: "user",
+    });
+    await waitFor(other, "done");
+    const second = createWorkspaceTools(await openWorkspace(), {
+      write: true,
+      bot: "Delta",
+      thread: other,
+    });
+    const slow = run(`printf 'Busy note\\n' > ${memory}/busy.md && sleep 0.4`);
+    await waitUntil(
+      async () => existsSync(join(WORKSPACE, memory, "busy.md")),
+      "the slow command never wrote",
+    );
+    await second[T.bash].execute!(
+      { command: "true" },
+      { toolCallId: "meanwhile", messages: [], context: {} },
+    );
+    await slow;
+    const busy = [
+      ...(await listLessons({ thread: id })),
+      ...(await listLessons({ thread: other })),
+    ].filter((one) => one.name === "busy.md");
+    assert.equal(busy.length, 1);
+    await undoLesson(busy[0]!.id);
+    // The bot's page lists its lessons newest first
+    assert.deepEqual(
+      (await listLessons({ bot: "Delta" })).map((one) => one.name),
+      ["busy.md", "kept.md", "price-compare", "shop.md"],
+    );
+  } finally {
+    await rm(join(WORKSPACE, "bots/Delta"), { recursive: true, force: true });
+  }
 });
 
 test("natural turns send asynchronously and retain participant histories", async () => {

@@ -3,6 +3,7 @@ import { type ToolSet, tool } from "ai";
 import * as z from "zod";
 import { EXEC_TIMEOUT_MS } from "@/config";
 import { TOOL_NAMES } from "@/features/ai/tools/tool-name";
+import { holdKept, noteKept } from "@/features/bot/bot.lesson";
 import { holdBotMemory, keepBotMemory } from "@/features/bot/bot.memory";
 import { writeRefusal } from "@/features/workspace/workspace";
 import { BASH, HIDDEN, type Sandbox } from "@/lib/sandbox";
@@ -23,10 +24,13 @@ export const createWorkspaceTools = (
     timeoutMs?: number;
     /**
      * The bot this shell is for: neither tool takes its own memory past its
-     * limits (bot.memory keepBotMemory), and `write_file` starts nothing new at
-     * the top of `artifacts/` but its folder (workspace.ts writeRefusal).
+     * limits (bot.memory keepBotMemory), what either changes of its memory and
+     * skills is noted as a lesson (bot.lesson), and `write_file` starts nothing
+     * new at the top of `artifacts/` but its folder (workspace.ts writeRefusal).
      */
     bot?: string;
+    /** The job this shell works in: the one a lesson is noted under. */
+    thread?: string | null;
   },
 ): ToolSet => {
   /** Fold absolute sandbox paths against cwd; they still resolve when handed back. */
@@ -38,15 +42,23 @@ export const createWorkspaceTools = (
   // The tool set is built per run, so one guide per run lives in this closure.
   let owed = options.guide === true;
 
-  /** Runs a step that can write, then puts back what it took past the bot's memory limits and says so. */
+  /**
+   * Runs a step that can write, then puts back what it took past the bot's memory limits and
+   * says so, and notes what it changed of what the bot keeps — once the limits have had their say.
+   */
   const guarded = async <T>(
     step: () => Promise<T>,
   ): Promise<{ result: T; memory: string | null }> => {
     const bot = options.bot;
     if (!bot) return { result: await step(), memory: null };
     const held = await holdBotMemory(bot);
-    const result = await step();
-    return { result, memory: await keepBotMemory(bot, held) };
+    await holdKept(bot);
+    try {
+      const result = await step();
+      return { result, memory: await keepBotMemory(bot, held) };
+    } finally {
+      await noteKept(bot, options.thread ?? null);
+    }
   };
 
   const bash = tool({

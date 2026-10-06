@@ -12,6 +12,8 @@ import * as z from "zod";
 import type { Effort, TextModelProviderId } from "@/features/ai/model.schema";
 import {
   botIconSchema,
+  type KeptFiles,
+  type LessonKind,
   type OwnLine,
   type ThreadPending,
   type ThreadSpeaker,
@@ -521,6 +523,42 @@ export const memoryFactTable = sqliteTable(
   (t) => [
     index("idx_memory_fact_note").on(t.noteId, t.isLatest),
     index("idx_memory_fact_call").on(t.callId),
+  ],
+);
+
+/**
+ * What a bot kept for itself while it worked — a file of its memory, a skill of its own — as it
+ * was before and after, one row per thing one job changed (features/bot/bot.lesson). The screen
+ * shows each and can put it back. `thread_id` is no foreign key: a lesson stays after its job is
+ * cleared, as the memory it changed does, and its label says which job it was.
+ */
+export const botLessonTable = sqliteTable(
+  "bot_lesson",
+  {
+    id: int("id").primaryKey({ autoIncrement: true }),
+    bot: text("bot").notNull(),
+    threadId: text("thread_id"),
+    threadLabel: text("thread_label").notNull(),
+    kind: text("kind").notNull().$type<LessonKind>(),
+    /** The memory file's name, or the skill's folder. */
+    name: text("name").notNull(),
+    /** Null when it was not there before: written new. */
+    before: text("before", { mode: "json" }).$type<KeptFiles>(),
+    /** Null when it is gone after: removed. */
+    after: text("after", { mode: "json" }).$type<KeptFiles>(),
+    createdAt: int("created_at", { mode: "timestamp" })
+      .notNull()
+      .$defaultFn(() => new Date()),
+    /** Its last change in the same job, which is folded into this row. */
+    updatedAt: int("updated_at", { mode: "timestamp" })
+      .notNull()
+      .$defaultFn(() => new Date()),
+    /** When the user put it back as it was before. */
+    undoneAt: int("undone_at", { mode: "timestamp" }),
+  },
+  (t) => [
+    index("idx_bot_lesson_thread").on(t.threadId),
+    index("idx_bot_lesson_bot").on(t.bot, t.createdAt),
   ],
 );
 

@@ -512,6 +512,7 @@ async function buildTools(run: ToolRun): Promise<ToolSet> {
       // Its own memory stays within its limits whichever of the two writes it
       // (bot.memory), and its finished work stays in its own folder
       bot: run.bot,
+      thread: run.thread,
     }),
     // Pinned tools come with schemas; the rest sit behind `tool_search`, absent when nothing is left to find (mcp.tool)
     ...(await createMcpTools(run.bot, sandbox)),

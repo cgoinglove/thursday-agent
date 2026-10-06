@@ -54,7 +54,7 @@ export async function listBotMemory(
 }
 
 /** What counts as a memory file, for the listing and the limits alike: a plain file, not hidden. */
-async function readMemoryFolder(
+export async function readMemoryFolder(
   dir: string,
 ): Promise<{ name: string; info: Stats }[]> {
   const names = await readdir(dir).catch(() => []);
@@ -172,35 +172,39 @@ export async function keepBotMemory(
 /** A file's length as BOT_MEMORY_LIMITS counts it. */
 const charCount = (text: string): number => [...text.trim()].length;
 
-/**
- * The line a file is listed by: its first, without a heading's `#`. A file that opens with
- * frontmatter anyway — a shape models are trained on — is listed by its `description`, or by
- * the first line after it.
- */
+/** The line a file is listed by, read from its head (`listingLine`). */
 async function firstLine(path: string): Promise<string> {
   const handle = await open(path, "r").catch(() => null);
   if (!handle) return "";
   try {
     const head = Buffer.alloc(HEAD_BYTES);
     const { bytesRead } = await handle.read(head, 0, HEAD_BYTES, 0);
-    const lines = head
-      .toString("utf8", 0, bytesRead)
-      .split("\n")
-      .map((line) => line.trim())
-      .filter(Boolean);
-    if (lines[0] === "---") {
-      const said = lines.find((line) => line.startsWith("description:"));
-      if (said) {
-        return said
-          .slice("description:".length)
-          .trim()
-          .replace(/^["']|["']$/g, "");
-      }
-      const end = lines.indexOf("---", 1);
-      return end > 0 ? (lines[end + 1] ?? "").replace(/^#+\s*/, "") : "";
-    }
-    return (lines[0] ?? "").replace(/^#+\s*/, "");
+    return listingLine(head.toString("utf8", 0, bytesRead));
   } finally {
     await handle.close();
   }
+}
+
+/**
+ * The line a text is listed by: its first, without a heading's `#`. A file that opens with
+ * frontmatter anyway — a shape models are trained on, and every skill's `SKILL.md` — is listed
+ * by its `description`, or by the first line after it.
+ */
+export function listingLine(text: string): string {
+  const lines = text
+    .split("\n")
+    .map((line) => line.trim())
+    .filter(Boolean);
+  if (lines[0] === "---") {
+    const said = lines.find((line) => line.startsWith("description:"));
+    if (said) {
+      return said
+        .slice("description:".length)
+        .trim()
+        .replace(/^["']|["']$/g, "");
+    }
+    const end = lines.indexOf("---", 1);
+    return end > 0 ? (lines[end + 1] ?? "").replace(/^#+\s*/, "") : "";
+  }
+  return (lines[0] ?? "").replace(/^#+\s*/, "");
 }

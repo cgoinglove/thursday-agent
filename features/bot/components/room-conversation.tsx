@@ -25,6 +25,7 @@ import {
   shortenPaths,
 } from "@/features/bot/components/attachments";
 import { BotMark } from "@/features/bot/components/bot-mark";
+import { JobLessons } from "@/features/bot/components/lesson-rows";
 import { ThursdayMark } from "@/features/thursday/components/thursday-mark";
 import { FileViewer } from "@/features/workspace/components/file-view";
 import { toDate } from "@/lib/date-like";
@@ -377,6 +378,7 @@ export function Conversation({
             />
           ),
         )}
+        {!side && <JobLessons threadId={thread.id} faces={roster} />}
       </div>
     </FileViewer>
   );

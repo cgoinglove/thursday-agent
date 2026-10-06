@@ -685,6 +685,18 @@ export const COMMON_VALIDATE = {
 export const BOT_MEMORY_LIMITS = { files: 60, chars: 3_000 };
 
 /**
+ * What a bot keeps for itself, as the screen shows and puts back (features/bot/bot.lesson).
+ * - `fileChars`  the longest file of a skill held as text, before and after a command, so a
+ *                change can be put back; a longer one, or one that is not text, is named as
+ *                changed and left as it is. Higher holds more of a large skill in the database
+ *                at each change; lower leaves more of one that cannot be put back.
+ * - `listed`     lessons a bot's page lists, newest first.
+ * - `shownChars`  how much of the memory file or SKILL.md a lesson's row opens to; the rest is
+ *                on disk. Higher carries more text in every list of lessons.
+ */
+export const BOT_LESSON = { fileChars: 64_000, listed: 40, shownChars: 2_000 };
+
+/**
  * When a job is done, each bot that worked in it looks back once and keeps what it learned
  * about working (bot.runner reflect): Hermes Agent writes a skill after a task of five or more
  * tool calls, OpenClaw has its agent save before compaction. Here no job of 40 overnight

@@ -1,7 +1,7 @@
 ---
-checked: 2026-10-01
+checked: 2026-10-06
 paths:
-  - "features/bot/{bot,room,thread}.{action,file,memory,query,run,runner,schema}.ts"
+  - "features/bot/{bot,room,thread,lesson}.{action,file,lesson,memory,query,run,runner,schema}.ts"
   - "features/routine/**"
   - "features/ai/prompts/bot.prompt.ts"
   - "features/ai/tools/{bot,routine}.tool.ts"
@@ -22,6 +22,7 @@ instead — and everything it did stays as rows.
 - `features/bot/room.query.ts` — the room's rows: exchanges, inboxes, questions, relays, and
   when a thread is done or waiting.
 - `features/bot/bot.run.ts` — one participant's turn: prompt, tools, stream, compaction, resume.
+- `features/bot/bot.lesson.ts` — lessons: what a command changed of a bot's memory and skills.
 - `features/bot/thread.query.ts` — thread rows and what the screen and the call read of them.
 - `features/bot/bot.schema.ts` — bot and thread shapes: thread status, `isAppStop`, `standOf`.
 - `features/bot/thread.file.ts` — a note about a file to the thread that reported it: which

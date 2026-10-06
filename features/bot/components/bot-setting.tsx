@@ -88,6 +88,7 @@ import {
 } from "@/features/bot/bot.schema";
 import { BOT_SEEDS, type BotSeed } from "@/features/bot/bot.seed";
 import { BotMark, iconProps } from "@/features/bot/components/bot-mark";
+import { BotLessons } from "@/features/bot/components/lesson-rows";
 import { MarkPalette } from "@/features/bot/components/mark-palette";
 import {
   type BotRef,
@@ -1185,6 +1186,8 @@ function BotPage({
             </p>
           )}
         </Row>
+
+        {bot && <BotLessons bot={bot.name} />}
 
         {bot && <Memory bot={bot.name} />}
 

@@ -58,6 +58,13 @@ looks back once and keeps what a later job would otherwise have to find out agai
 skill of its own; that look back adds a little to the job's tokens. **Bots keep their own memory**,
 on the same screen, turns that on or off for every bot, the look back with it.
 
+Whatever a bot keeps or changes for itself — a note, a skill of its own — shows at the end of that
+job under **Kept for next time**, and on its page under **Learned**, newest first, with the job it
+came from. A row opens to the note or skill as the job left it, and **Undo** puts it back as it was
+before that job, or deletes it when the job wrote it new. It is read from what changed on disk, so
+a bot that says it kept something and did not shows nothing. A note or skill changed again since
+is put back only after the later change.
+
 ## A job is a thread
 
 Work handed to a bot becomes a thread: the request, every step, what it asked and what it answered.

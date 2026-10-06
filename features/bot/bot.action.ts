@@ -6,6 +6,7 @@ import { textModelProviderSchema } from "@/features/ai/model.schema";
 import { removeBotFolder } from "@/features/workspace/workspace";
 import { serverAction } from "@/lib/protocol/server-action";
 import { publicError } from "@/lib/public-error";
+import { undoLesson } from "./bot.lesson";
 import {
   clearOwnLine,
   countBots,
@@ -202,6 +203,11 @@ export const cancelThreadAction = serverAction(async (ref: string) => {
   await cancelThread(thread.id);
   return { id: thread.id, label: thread.label, status: "cancelled" as const };
 });
+
+/** Puts back one thing a bot kept for itself, as it was before its job changed it (bot.lesson). */
+export const undoLessonAction = serverAction(async (id: unknown) => ({
+  said: await undoLesson(z.number().int().parse(id)),
+}));
 
 /** The room's Stop all: every thread at work stops, as each one's Stop would stop it. */
 export const cancelRunningThreadsAction = serverAction(async () => ({
