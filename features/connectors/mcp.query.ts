@@ -21,6 +21,7 @@ import {
   sealSecret,
   UnreadableSecret,
 } from "@/lib/secret";
+import { stringsIn } from "@/lib/utils";
 
 /**
  * `oauth` holds tokens, so reads that reach the browser select columns
@@ -446,6 +447,26 @@ export async function sealMcpSecrets(): Promise<{
       if (clear) sealed++;
     }
     return { sealed, unreadable };
+  });
+}
+
+/**
+ * Every credential a connector holds, as a command could print it (workspace heldSecrets): its
+ * headers' and env's values, the token after a header's scheme (`Bearer <token>`), and each text
+ * its OAuth sign-in keeps. One this data folder's key cannot open has no value to hide.
+ */
+export async function connectorSecretValues(): Promise<string[]> {
+  const rows = await database
+    .select({ config: mcpServerTable.config, oauth: mcpServerTable.oauth })
+    .from(mcpServerTable);
+  return rows.flatMap((row) => {
+    const config = openedConfig(row.config);
+    const values = Object.values(
+      (config && (isRemoteConfig(config) ? config.headers : config.env)) ?? {},
+    ).flatMap((value) => [value, value.split(" ").at(-1) ?? value]);
+    const oauth = row.oauth && openedOAuth(row.oauth);
+    const { state, authorizationServer, ...secret } = oauth || {};
+    return [...values, ...stringsIn(secret)];
   });
 }
 

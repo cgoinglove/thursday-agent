@@ -114,6 +114,17 @@ export function encryptionKey(): EncryptionKey {
   return { key, from: "file" };
 }
 
+/**
+ * The key as text, in each form its file may hold it — base64 or base64url, the padding left
+ * off — for a shell to hide from what it prints (workspace heldSecrets).
+ */
+export function encryptionKeyTexts(): string[] {
+  const { key } = encryptionKey();
+  return [key.toString("base64"), key.toString("base64url")].map((text) =>
+    text.replace(/=+$/, ""),
+  );
+}
+
 export const isSealed = (value: string) => value.startsWith(SEALED);
 
 /** `plain`, sealed. A fresh nonce each time, so two equal secrets never look alike. */

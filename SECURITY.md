@@ -31,6 +31,17 @@ What the app does to keep that narrow:
   and the `.env` with the key they are sealed with, are files on the same
   machine, and a bot has a shell. Reads are not fenced — a bot that cannot look
   around cannot do the work.
+- **What a shell prints hides the secrets the app keeps.** The key in the data
+  folder's `.env`, every key, token and sign-in saved in Settings, a connector's
+  credentials, and every environment variable named like a secret are replaced
+  by `[hidden: a secret Thursday keeps]` in what any command prints, before a
+  model, a thread or the file a long output spills to sees it (`lib/sandbox.ts`,
+  `heldSecrets` in `features/workspace/workspace.ts`). That keeps them out of
+  what goes to a model provider and what the app stores; it does not keep them
+  from a bot. A command can still use one without printing it — send the `.env`
+  somewhere, or print a key encoded or in pieces — and values under twelve
+  characters (`HIDDEN_SECRET_MIN`), the cookies of a kept sign-in and anything
+  else on disk the app did not put there are shown as they are.
 - **The file tool is fenced; the shell is not.** `write_file` refuses the app's
   own directory and the workspace root, and inside the workspace accepts only its
   folders (`features/workspace/workspace.ts`). A path outside the workspace is

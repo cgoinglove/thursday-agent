@@ -4,6 +4,7 @@ import { mkdir, readdir, readFile, writeFile } from "node:fs/promises";
 import { join, resolve as pathResolve, relative, sep } from "node:path";
 import type { Readable } from "node:stream";
 import { EXEC_KILL_GRACE_MS, EXEC_TIMEOUT_MS } from "@/config";
+import { errorToString } from "@/lib/utils";
 
 /**
  * The shell a command runs in: bash where the machine has it, which is what the tool says
@@ -55,9 +56,9 @@ export interface Sandbox {
   ): Promise<ExecResult>;
 
   /**
-   * Folds long text to head and tail, writing the whole under the spill dir and
-   * naming the path in between. Shell output goes through this on its own;
-   * tools that fetch (MCP) call it themselves.
+   * Hides the sandbox's secrets, then folds long text to head and tail, writing
+   * the whole under the spill dir and naming the path in between. Shell output
+   * goes through this on its own; tools that fetch (MCP) call it themselves.
    */
   fold(text: string, name?: string): Promise<string>;
 }
@@ -104,6 +105,10 @@ export async function* walkFiles(dir: string): AsyncGenerator<string> {
 export const APP_OWN =
   /^(PORT|HOSTNAME|NODE_ENV|INIT_CWD|NEXT_MANUAL_SIG_HANDLE)$|^_*NEXT_|^TURBOPACK|^npm_|^THURSDAY_/i;
 
+/** A variable named like a key, a token or a secret: kept out of every shell, and its value out of what one prints. */
+export const SECRET_NAME =
+  /KEY|TOKEN|SECRET|PASS|_PWD|CREDENTIAL|_AUTH|_DSN|DATABASE_URL/i;
+
 /**
  * Environment for every shell the agent runs: the user's own, less the app's (APP_OWN) and
  * less secrets, which do not travel to children. Nobody watches it, so no pager may stall it.
@@ -114,12 +119,7 @@ function shellEnv(): NodeJS.ProcessEnv {
 
   // A compromised npm dependency would read keys straight out of process.env
   for (const name of Object.keys(env)) {
-    if (
-      APP_OWN.test(name) ||
-      /KEY|TOKEN|SECRET|PASS|_PWD|CREDENTIAL|_AUTH|_DSN|DATABASE_URL/i.test(
-        name,
-      )
-    ) {
+    if (APP_OWN.test(name) || SECRET_NAME.test(name)) {
       delete env[name];
     }
   }
@@ -138,10 +138,69 @@ export type SpillPolicy = {
   tail: number;
 };
 
+/** What stands where a secret was, in what a command prints. */
+export const HIDDEN = "[hidden: a secret Thursday keeps]";
+
+/**
+ * Hides `secrets` in a text that arrives in pieces, as a command prints it. A secret can be split
+ * across two pieces, so whatever could still be part of one is held back until the next piece,
+ * or the end, says what it is: what comes out never holds a secret, whole or in part.
+ */
+function hider(secrets: readonly string[]) {
+  const list = [...new Set(secrets.filter(Boolean))].sort(
+    (a, b) => b.length - a.length,
+  );
+  const longest = list[0]?.length ?? 0;
+  let held = "";
+
+  const hide = (text: string) => {
+    let out = text;
+    // Longest first, so a secret that holds a shorter one is hidden whole
+    for (const secret of list) out = out.split(secret).join(HIDDEN);
+    return out;
+  };
+
+  /** Where `text` can be cut at or before `at` with no secret across the cut. */
+  const cutBefore = (text: string, at: number) => {
+    let cut = at;
+    for (let moved = true; moved; ) {
+      moved = false;
+      for (const secret of list) {
+        const from = text.indexOf(secret, Math.max(0, cut - secret.length + 1));
+        if (from !== -1 && from < cut) {
+          cut = from;
+          moved = true;
+        }
+      }
+    }
+    return cut;
+  };
+
+  return {
+    hide,
+    /** What of `held` and `piece` can go out now. */
+    push(piece: string): string {
+      if (!longest) return piece;
+      const text = held + piece;
+      // A secret not yet whole starts within its own length of the end
+      const cut = cutBefore(text, Math.max(0, text.length - longest + 1));
+      held = text.slice(cut);
+      return hide(text.slice(0, cut));
+    },
+    /** What is still held, once nothing more is coming. */
+    end(): string {
+      const rest = hide(held);
+      held = "";
+      return rest;
+    },
+  };
+}
+
 export const createSandBox = ({
   workingDirectory,
   spill,
   toolPath,
+  secrets,
 }: {
   workingDirectory: string;
   spill: SpillPolicy;
@@ -150,6 +209,12 @@ export const createSandBox = ({
    * Appended, not prepended, so a copy the user installed wins.
    */
   toolPath?: string[];
+  /**
+   * Values never shown in what a command prints or `fold` folds, read again for each: each is
+   * replaced by HIDDEN before anything else sees the output — the result, and the file a long
+   * one spills to.
+   */
+  secrets?: () => Promise<readonly string[]>;
 }): Sandbox => {
   const cwd = pathResolve(workingDirectory);
   const extraPath = (toolPath ?? []).filter(Boolean).join(":");
@@ -170,7 +235,8 @@ export const createSandBox = ({
 
     readdir: (p, opts) => readdir(res(p), opts),
 
-    fold: (text, name = "output") => foldLong(text, name, cwd, spill),
+    fold: async (text, name = "output") =>
+      foldLong(hider((await secrets?.()) ?? []).hide(text), name, cwd, spill),
 
     async listFiles(path, { limit = 200, skip = [] } = {}) {
       const root = res(path);
@@ -184,7 +250,21 @@ export const createSandBox = ({
       return { files: all.slice(0, limit), total: all.length };
     },
 
-    exec(command, { cwd: c, timeoutMs = EXEC_TIMEOUT_MS, signal, env } = {}) {
+    async exec(
+      command,
+      { cwd: c, timeoutMs = EXEC_TIMEOUT_MS, signal, env } = {},
+    ) {
+      let hidden: readonly string[];
+      try {
+        hidden = (await secrets?.()) ?? [];
+      } catch (cause) {
+        // Run without them, and what it prints could carry one to the model
+        return {
+          exitCode: -1,
+          stdout: "",
+          stderr: `Not run: the secrets to hide from what it prints could not be read (${errorToString(cause)}).`,
+        };
+      }
       return new Promise((resolve) => {
         const base = shellEnv();
         if (extraPath) base.PATH = `${base.PATH ?? ""}:${extraPath}`;
@@ -196,8 +276,20 @@ export const createSandBox = ({
           // signalling only the shell leaves it running
           detached: true,
         });
-        const stdout = collect(child.stdout, "stdout", cwd, spill);
-        const stderr = collect(child.stderr, "stderr", cwd, spill);
+        const stdout = collect(
+          child.stdout,
+          "stdout",
+          cwd,
+          spill,
+          hider(hidden),
+        );
+        const stderr = collect(
+          child.stderr,
+          "stderr",
+          cwd,
+          spill,
+          hider(hidden),
+        );
 
         const group = (name: NodeJS.Signals) => {
           try {
@@ -284,13 +376,15 @@ const folded = (
  * fits in `policy.max`, and past that a head, a tail and a file holding all of it. Folded
  * as it comes rather than once the command has exited: held whole until then, one command
  * that prints without end (`base64` of a film, a log, a recursive grep) grows one string
- * until the process runs out of memory, which takes every job and call with it.
+ * until the process runs out of memory, which takes every job and call with it. Secrets are
+ * hidden as it arrives (`hider`), so neither the text nor the file ever holds one.
  */
 function collect(
   source: Readable | null,
   name: string,
   workspace: string,
   policy: SpillPolicy,
+  secrets: ReturnType<typeof hider>,
 ) {
   /** All of it while it fits; its first `head` characters once it does not. */
   let kept = "";
@@ -310,7 +404,7 @@ function collect(
       file.once("drain", () => source.resume());
     }
   };
-  const add = (chunk: string) => {
+  const keep = (chunk: string) => {
     if (!chunk) return;
     if (path) {
       newlines += chunk.match(/\n/g)?.length ?? 0;
@@ -345,6 +439,8 @@ function collect(
     );
   };
 
+  const add = (chunk: string) => keep(secrets.push(chunk));
+
   source?.setEncoding("utf8");
   source?.on("data", add);
 
@@ -352,6 +448,7 @@ function collect(
     /** Words of the app's own, after whatever the command wrote. */
     add,
     async text(): Promise<string> {
+      keep(secrets.end());
       if (!path) return kept;
       await written;
       const out = file as WriteStream | null;

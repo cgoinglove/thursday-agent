@@ -11,6 +11,7 @@ import {
   sealSecret,
   UnreadableSecret,
 } from "@/lib/secret";
+import { stringsIn } from "@/lib/utils";
 import {
   CONFIG_ENTRIES,
   CONFIG_GROUPS,
@@ -162,6 +163,34 @@ export async function sealConfigSecrets(): Promise<{
     }
     return { sealed, unreadable };
   });
+}
+
+/**
+ * Every secret Settings holds, as a command could print it (workspace heldSecrets): each key,
+ * the environment's where it sets one, and each text a sign-in keeps — its tokens. One this data
+ * folder's key cannot open has no value to hide.
+ */
+export async function configSecretValues(): Promise<string[]> {
+  const rows = await database.select().from(configTable);
+  const values = rows.flatMap((row) => {
+    if (!isSecretKey(row.key)) return [];
+    const value = opened(row.value)?.trim();
+    if (!value) return [];
+    return CONFIG_ENTRIES[row.key]?.signIn ? textsOf(value) : [value];
+  });
+  const fromEnv = CONFIG_KEYS.filter(isSecretKey).flatMap(
+    (key) => process.env[key]?.trim() || [],
+  );
+  return [...values, ...fromEnv];
+}
+
+/** The texts a sign-in's JSON holds; the whole value when it is not JSON. */
+function textsOf(value: string): string[] {
+  try {
+    return stringsIn(JSON.parse(value));
+  } catch {
+    return [value];
+  }
 }
 
 /** Whether a call can open (the keys group's `requireKeys`, a sign-in on a plan with calls); decides call screen vs intro. */

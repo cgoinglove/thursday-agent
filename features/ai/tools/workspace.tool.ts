@@ -5,7 +5,7 @@ import { EXEC_TIMEOUT_MS } from "@/config";
 import { TOOL_NAMES } from "@/features/ai/tools/tool-name";
 import { holdBotMemory, keepBotMemory } from "@/features/bot/bot.memory";
 import { writeRefusal } from "@/features/workspace/workspace";
-import { BASH, type Sandbox } from "@/lib/sandbox";
+import { BASH, HIDDEN, type Sandbox } from "@/lib/sandbox";
 
 /**
  * Shell access, plus `write_file` for bots: multi-line files through a
@@ -125,4 +125,6 @@ Every command is a new shell: \`cd\`, exported variables and an activated venv a
 
 Nothing is watching it. A command that stops to ask never gets an answer and is killed after ${EXEC_TIMEOUT_MS / 1000}s, so pass the flag that skips the question (\`-y\`, \`--yes\`, \`--no-input\`), and send anything genuinely long to the background with its output redirected to a file.
 
-Keys are not in the environment: every variable named like a key, a token or a secret is removed before the shell starts. An empty one is not an unset one — say which it was, and ask for what a command needs.`;
+Keys are not in the environment: every variable named like a key, a token or a secret is removed before the shell starts. An empty one is not an unset one — say which it was, and ask for what a command needs.
+
+A key the app keeps prints as \`${HIDDEN}\`, wherever a command shows it, while the file still holds the key itself: change such a file with a command that leaves that line as it is, and never write the placeholder into one.`;

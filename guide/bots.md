@@ -48,6 +48,10 @@ bots. A ready-made bot differs only in its role, and some carry a skill of their
   sent, such as a finished page mailed to them.
 - **Jarvis** takes whatever nobody else is for — the web, files, this computer.
 
+What a bot's shell prints never shows a key the app keeps — an API key, a phone's token, the GPT
+Subscription sign-in, a connector's credentials, or the key in the data folder's `.env`. In a thread
+it reads `[hidden: a secret Thursday keeps]`, and the file it came from still holds the key.
+
 A bot keeps its own memory — what a job taught it about working, how the user asked it to work —
 one small note to a file, listed on its page. When a job is done, each bot that did real work in it
 looks back once and keeps what a later job would otherwise have to find out again, or improves a

@@ -579,6 +579,14 @@ export const CREW_REST = { awakeMs: 4_000 };
 export const TOOL_OUTPUT = { max: 8_000, head: 5_500, tail: 1_500 };
 
 /**
+ * The shortest secret hidden from what a shell prints (chars; workspace heldSecrets). A
+ * connector's headers and env are sealed whole, plain values beside the credentials, and a
+ * short one — `info`, a port, a folder's name — would be hidden everywhere it appears. Lower
+ * hides more ordinary text; higher shows a short credential.
+ */
+export const HIDDEN_SECRET_MIN = 12;
+
+/**
  * Limits on one bot run (features/bot/bot.run).
  * - `steps`  steps per segment; at the limit the last step is forced to `answer`
  *            and the job waits for the user to continue.

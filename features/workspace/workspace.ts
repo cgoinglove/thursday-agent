@@ -17,6 +17,7 @@ import {
   BROWSER_CLI,
   BROWSER_VIEWPORT,
   DATA_DIR,
+  HIDDEN_SECRET_MIN,
   JOB_FOLDER_WALK,
   PATHS,
   TOOL_OUTPUT,
@@ -24,8 +25,16 @@ import {
 } from "@/config";
 import type { BotIcon } from "@/features/bot/bot.schema";
 import { markStill } from "@/features/bot/mark.geometry";
+import { configSecretValues } from "@/features/config/config.query";
+import { connectorSecretValues } from "@/features/connectors/mcp.query";
 import { logger } from "@/lib/logger";
-import { createSandBox, type Sandbox, walkFiles } from "@/lib/sandbox";
+import {
+  createSandBox,
+  type Sandbox,
+  SECRET_NAME,
+  walkFiles,
+} from "@/lib/sandbox";
+import { encryptionKeyTexts } from "@/lib/secret";
 import { slug } from "@/lib/utils";
 
 /**
@@ -625,6 +634,29 @@ const FENCE: Record<string, string> = {
   ".npmrc": "recursive-install=false\n",
 };
 
+/**
+ * The secrets the app holds, as a command could print them, for every shell to hide from what it
+ * prints: the key `local.db`'s secrets are sealed with, which sits in plain text in the data
+ * folder's `.env`; every key, token and sign-in Settings and the connectors keep; and what the
+ * environment holds under a secret's name, which no shell is given (lib/sandbox SECRET_NAME) and
+ * a command could still read from the file that set it. Read again for every command, so a key
+ * entered a moment ago is hidden in the next.
+ */
+async function heldSecrets(): Promise<string[]> {
+  const fromEnv = Object.entries(process.env).flatMap(([name, value]) =>
+    SECRET_NAME.test(name) && value ? [value] : [],
+  );
+  const all = [
+    ...encryptionKeyTexts(),
+    ...(await configSecretValues()),
+    ...(await connectorSecretValues()),
+    ...fromEnv,
+  ];
+  return all
+    .map((value) => value.trim())
+    .filter((value) => value.length >= HIDDEN_SECRET_MIN);
+}
+
 export async function openWorkspace(): Promise<Sandbox> {
   for (const folder of [...BOT_FOLDERS, BROWSER_MARK]) {
     await mkdir(join(WORKSPACE, folder), { recursive: true });
@@ -639,6 +671,7 @@ export async function openWorkspace(): Promise<Sandbox> {
     workingDirectory: WORKSPACE,
     spill: { dir: PATHS.output, ...TOOL_OUTPUT },
     toolPath: TOOL_PATH,
+    secrets: heldSecrets,
   });
   // Every write a bot or the call makes passes here, whatever made it: a file open on
   // screen is asked again whether it changed (app-event `files`), a failed command too,

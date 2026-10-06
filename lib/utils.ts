@@ -48,6 +48,13 @@ export function errorToString(cause: unknown): string {
   }
 }
 
+/** Every string inside a parsed JSON value, however deep: the texts a stored blob holds. */
+export function stringsIn(value: unknown): string[] {
+  if (typeof value === "string") return [value];
+  if (!value || typeof value !== "object") return [];
+  return Object.values(value).flatMap(stringsIn);
+}
+
 /** 1234 → "1.2k", 1234567 → "1.2M". For numbers read only for their size, like tokens. */
 export function formatCount(n: number): string {
   if (n < 1000) return String(n);

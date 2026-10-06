@@ -1178,3 +1178,130 @@ test("the key never reaches a bot's shell", async () => {
     delete process.env.THURSDAY_ENCRYPTION_KEY;
   }
 });
+
+test("what a shell prints never holds a secret, whole or in part: split across what it writes, on stderr, or past where a long one is cut", async () => {
+  const { createSandBox, HIDDEN } = await import("../lib/sandbox.ts");
+  const KEY = "sk-test-0123456789abcdefghijKEPT";
+  const TOKEN = "xoxb-9876543210-zyxwvutsTOKEN";
+  const shell = createSandBox({
+    workingDirectory: home,
+    spill: { dir: "spill", max: 8000, head: 5500, tail: 1500 },
+    secrets: async () => [KEY, TOKEN],
+  });
+  const partOf = (text: string, secret: string) =>
+    text.includes(secret.slice(0, 8)) || text.includes(secret.slice(-8));
+
+  const whole = await shell.exec(
+    `printf 'a=${KEY}\\n' && printf '${TOKEN}' >&2`,
+  );
+  assert.equal(whole.stdout, `a=${HIDDEN}\n`);
+  assert.equal(whole.stderr, HIDDEN);
+
+  // Two writes a moment apart arrive as two pieces, the secret cut between them
+  const split = await shell.exec(
+    `printf '${KEY.slice(0, 13)}'; sleep 0.3; printf '${KEY.slice(13)} done'`,
+  );
+  assert.equal(split.stdout, `${HIDDEN} done`);
+
+  // Long enough to be folded and spilled, with a secret across each cut and in the middle
+  const filler = (n: number) => `head -c ${n} /dev/zero | tr '\\0' x`;
+  const long = await shell.exec(
+    [
+      filler(5490),
+      `printf '${KEY}'`,
+      filler(9000),
+      `printf '${TOKEN}'`,
+      filler(1490),
+      `printf '${KEY}'`,
+      filler(20),
+    ].join("; "),
+  );
+  assert.ok(!partOf(long.stdout, KEY) && !partOf(long.stdout, TOKEN));
+  assert.ok(long.stdout.includes(HIDDEN));
+  const spilled = /is at (\S+)\./.exec(long.stdout)?.[1];
+  assert.ok(spilled, "the long output names the file it spilled to");
+  const file = await readFile(join(home, spilled), "utf8");
+  assert.ok(!partOf(file, KEY) && !partOf(file, TOKEN));
+  assert.equal(file.split(HIDDEN).length - 1, 3);
+
+  // What a connector returns goes through fold, which hides them too
+  assert.equal(await shell.fold(`token: ${TOKEN}`), `token: ${HIDDEN}`);
+});
+
+test("a command whose secrets cannot be read is not run, and says why", async () => {
+  const { createSandBox } = await import("../lib/sandbox.ts");
+  const shell = createSandBox({
+    workingDirectory: home,
+    spill: { dir: "spill", max: 8000, head: 5500, tail: 1500 },
+    secrets: async () => {
+      throw new Error("database is closed");
+    },
+  });
+  const ran = await shell.exec("touch ran-anyway");
+  assert.equal(ran.exitCode, -1);
+  assert.match(ran.stderr, /^Not run: .*database is closed/);
+  assert.ok(!existsSync(join(home, "ran-anyway")));
+});
+
+test("a bot's shell hides the folder's key, every key and sign-in Settings keeps, a connector's credentials and a secret the environment holds; a pick and a short value show", async () => {
+  const { HIDDEN } = await import("../lib/sandbox.ts");
+  const { openWorkspace } = await import("../features/workspace/workspace.ts");
+  const apiKey = "sk-proj-shown-nowhere-0123456789";
+  const access = "eyJhbGciOi.access-token-of-the-plan.sig";
+  const refresh = "rt_refresh-token-of-the-plan-0123";
+  const bearer = "ghp_connector-token-0123456789";
+  const envToken = "tok_live_connector-env-0123456789";
+  const exported = "exported-in-the-shell-profile-0123";
+  await config.writeConfig(OPENAI, apiKey);
+  await config.writeConfig(
+    CHATGPT,
+    JSON.stringify({
+      access,
+      refresh,
+      accountId: "acct-0123456789ab",
+      expires: 1,
+    }),
+  );
+  await config.writeConfig(DEFAULT_MODEL_KEY, "openai/gpt-shown-in-full");
+  await mcp.upsertServer({
+    name: "hidden-remote",
+    config: {
+      url: "https://mcp.example.com/mcp",
+      headers: { Authorization: `Bearer ${bearer}` },
+    },
+  });
+  await mcp.upsertServer({
+    name: "hidden-local",
+    config: {
+      command: "npx",
+      args: ["-y", "some-server"],
+      env: { LOG_LEVEL: "info", API_TOKEN: envToken },
+    },
+  });
+  process.env.SOME_SERVICE_TOKEN = exported;
+  try {
+    const shell = await openWorkspace();
+    const lines = [
+      apiKey,
+      access,
+      refresh,
+      bearer,
+      envToken,
+      exported,
+      "openai/gpt-shown-in-full",
+      "level=info",
+    ];
+    await writeFile(join(shell.cwd, "projects", "seen.txt"), lines.join("\n"));
+    const { stdout } = await shell.exec("cat ../.env projects/seen.txt");
+    for (const value of [...secret.encryptionKeyTexts(), ...lines.slice(0, 6)])
+      assert.ok(!stdout.includes(value), `hidden: ${value.slice(0, 12)}…`);
+    assert.match(stdout, /THURSDAY_ENCRYPTION_KEY=\[hidden/);
+    assert.ok(stdout.includes("openai/gpt-shown-in-full"));
+    assert.ok(stdout.includes("level=info"));
+    assert.equal(stdout.split(HIDDEN).length - 1, 7);
+  } finally {
+    delete process.env.SOME_SERVICE_TOKEN;
+    await mcp.deleteServer("hidden-remote");
+    await mcp.deleteServer("hidden-local");
+  }
+});
