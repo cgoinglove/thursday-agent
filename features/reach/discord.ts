@@ -56,6 +56,8 @@ type DiscordMessage = {
   guild_id?: string;
   author: DiscordUser;
   content: string;
+  /** IS_VOICE_MESSAGE (VOICE_MESSAGE): its one attachment is what they said. */
+  flags?: number;
   attachments?: {
     filename: string;
     url: string;
@@ -63,6 +65,9 @@ type DiscordMessage = {
     content_type?: string;
   }[];
 };
+
+/** Message flag IS_VOICE_MESSAGE, `1 << 13`: "this message is a voice message" (Discord's message resource). */
+const VOICE_MESSAGE = 1 << 13;
 type DiscordInteraction = {
   id: string;
   token: string;
@@ -129,6 +134,19 @@ export function createDiscord(token: string): Channel {
     if (type === "MESSAGE_CREATE") {
       const message = data as DiscordMessage;
       if (message.guild_id || message.author.bot) return null;
+      const attached = (message.attachments ?? []).map((file) => ({
+        name: file.filename,
+        size: file.size,
+        fetch: async () => {
+          const response = await fetch(file.url);
+          if (!response.ok)
+            throw new Error(`Discord answered ${response.status} for the file`);
+          return new File([await response.arrayBuffer()], file.filename, {
+            type: file.content_type ?? "",
+          });
+        },
+      }));
+      const spoken = Boolean((message.flags ?? 0) & VOICE_MESSAGE);
       return {
         kind: "message",
         chat: message.channel_id,
@@ -136,20 +154,9 @@ export function createDiscord(token: string): Channel {
         // A username is one of a kind on Discord; the name shown beside it is not
         handle: `@${message.author.username}`,
         words: message.content.trim(),
-        files: (message.attachments ?? []).map((file) => ({
-          name: file.filename,
-          size: file.size,
-          fetch: async () => {
-            const response = await fetch(file.url);
-            if (!response.ok)
-              throw new Error(
-                `Discord answered ${response.status} for the file`,
-              );
-            return new File([await response.arrayBuffer()], file.filename, {
-              type: file.content_type ?? "",
-            });
-          },
-        })),
+        ...(spoken
+          ? { files: [], voice: attached[0] ?? null }
+          : { files: attached, voice: null }),
         unreadable: false,
       };
     }

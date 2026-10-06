@@ -209,9 +209,55 @@ test("discord identifies after hello, hands over a direct message, leaves a serv
         handle: "@sam",
         words: "hello",
         files: undefined,
+        voice: null,
         unreadable: false,
       },
     ],
+  );
+
+  // A voice message (flag IS_VOICE_MESSAGE): its audio is what they said, not a file
+  const attachment = {
+    filename: "voice-message.ogg",
+    url: "https://cdn.discordapp.com/voice.ogg",
+    size: 4,
+    content_type: "audio/ogg",
+  };
+  socket.receive({
+    op: 0,
+    t: "MESSAGE_CREATE",
+    s: 5,
+    d: {
+      id: "4",
+      channel_id: "dm1",
+      author,
+      content: "",
+      flags: 1 << 13,
+      attachments: [attachment],
+    },
+  });
+  // The same audio sent as a file stays a file
+  socket.receive({
+    op: 0,
+    t: "MESSAGE_CREATE",
+    s: 6,
+    d: {
+      id: "5",
+      channel_id: "dm1",
+      author,
+      content: "",
+      attachments: [attachment],
+    },
+  });
+  const [spoken, filed] = got.splice(1, 2) as {
+    files: { name: string }[];
+    voice: { name: string } | null;
+  }[];
+  assert.equal(spoken?.voice?.name, "voice-message.ogg");
+  assert.deepEqual(spoken?.files, []);
+  assert.equal(filed?.voice, null);
+  assert.deepEqual(
+    filed?.files.map((file) => file.name),
+    ["voice-message.ogg"],
   );
 
   socket.receive({
@@ -297,6 +343,7 @@ test("slack acknowledges every envelope and hands over only the direct conversat
         handle: "@sam",
         words: "hi",
         files: undefined,
+        voice: null,
         unreadable: false,
       },
     ],

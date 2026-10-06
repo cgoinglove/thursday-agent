@@ -154,6 +154,7 @@ export function createSlack(appToken: string, botToken: string): Channel {
             },
           ];
         }),
+        voice: null,
         unreadable: false,
       };
     }

@@ -33,7 +33,12 @@ type TelegramUser = {
   username?: string;
 };
 
-type TelegramFile = { file_id: string; file_size?: number };
+type TelegramFile = {
+  file_id: string;
+  file_size?: number;
+  /** A voice message's, as its sender's app set it. */
+  mime_type?: string;
+};
 
 /** Telegram answered, and said no: its words, and the status it answered in. */
 class TelegramError extends Error {
@@ -163,6 +168,8 @@ export function createTelegram(token: string): Channel {
     const message = update.message;
     if (!message?.from || message.chat.type !== "private") return null;
     const photo = message.photo?.at(-1);
+    // Bot API Message.voice: "Message is a voice message"
+    const voice = message.voice;
     const sent = message.document
       ? {
           id: message.document.file_id,
@@ -193,7 +200,19 @@ export function createTelegram(token: string): Channel {
             },
           ]
         : [],
-      unreadable: Boolean(message.voice || message.audio || message.video),
+      voice: voice
+        ? {
+            name: `voice-${message.message_id}.ogg`,
+            size: voice.file_size,
+            fetch: () =>
+              fetchFile(
+                voice.file_id,
+                `voice-${message.message_id}.ogg`,
+                voice.mime_type ?? "audio/ogg",
+              ),
+          }
+        : null,
+      unreadable: Boolean(message.audio || message.video),
     };
   }
 

@@ -22,8 +22,22 @@ let turnedAway = false;
 /** A message sent waits here before Telegram answers it, as a slow network holds it. */
 let sending: Promise<void> | null = null;
 const realFetch = globalThis.fetch;
+/** Voice messages the stand-in transcription model was handed. */
+let transcribed = 0;
 globalThis.fetch = (async (input: RequestInfo | URL, init?: RequestInit) => {
   const url = String(input);
+  // The transcription model a voice message is read by; nothing else of OpenAI's is called here
+  if (url.startsWith("https://api.openai.com/")) {
+    if (!url.endsWith("/audio/transcriptions"))
+      throw new Error(
+        `No OpenAI call but a transcription in this test: ${url}`,
+      );
+    transcribed += 1;
+    return new Response(
+      JSON.stringify({ text: " Pick up milk on the way home. " }),
+      { headers: { "content-type": "application/json" } },
+    );
+  }
   if (!url.startsWith("https://api.telegram.org/"))
     return realFetch(input, init);
   // A file they sent, fetched from where getFile said it is: a few bytes stand in for it
@@ -921,6 +935,62 @@ test("a file that does not come through is said at once, and what was written wi
       ),
     "and she knows it is not there",
   );
+});
+
+test("a voice message is read as words by the transcription model picked, and with none they are told where to pick one", async () => {
+  const voiceNote = (fileId: string) => ({
+    update_id: updateId++,
+    message: {
+      message_id: updateId,
+      from: { id: 7, first_name: "Sam" },
+      chat: { id: 7, type: "private" },
+      voice: { file_id: fileId, file_size: 4, mime_type: "audio/ogg" },
+    },
+  });
+  const { removeConfig } = await import("../features/config/config.query.ts");
+  const { MEDIA_MODEL_KEYS } = await import(
+    "../features/config/config.const.ts"
+  );
+
+  // None picked: said at once, not even fetched, and nothing for her
+  let from = sent.length;
+  const before = turns.length;
+  inbox.push(voiceNote("unheard"));
+  await until(
+    () => sent.slice(from).some((one) => one.method === "sendMessage"),
+    "they are told",
+  );
+  assert.equal(
+    String(
+      sent.slice(from).find((one) => one.method === "sendMessage")?.body.text,
+    ),
+    "Your voice message did not come through: voice messages are read once a transcription model is picked in Settings › Models.",
+  );
+  assert.ok(sent.slice(from).every((one) => one.method !== "getFile"));
+  assert.equal(turns.length, before);
+  assert.equal(transcribed, 0);
+
+  // Picked: what they said reaches her as words, marked as heard by a model
+  await writeConfig(
+    MEDIA_MODEL_KEYS.transcription,
+    "openai/gpt-4o-mini-transcribe",
+  );
+  await writeConfig("OPENAI_API_KEY", "sk-test-never-sent-anywhere");
+  try {
+    from = sent.length;
+    inbox.push(voiceNote("spoken"));
+    await until(
+      () =>
+        turns.at(-1)?.words ===
+        "[A voice message, as a transcription model heard it:] Pick up milk on the way home.",
+      "her turn comes with what they said",
+    );
+    assert.equal(transcribed, 1);
+    assert.ok(sent.slice(from).some((one) => one.method === "getFile"));
+  } finally {
+    await removeConfig(MEDIA_MODEL_KEYS.transcription);
+    await removeConfig("OPENAI_API_KEY");
+  }
 });
 
 /** A photo from Telegram, its sizes smallest first, with what was written under it. */

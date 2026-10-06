@@ -29,7 +29,12 @@ export type Incoming =
       handle: string | null;
       words: string;
       files: IncomingFile[];
-      /** It carried something reach cannot read yet (a voice note, a video). */
+      /**
+       * A voice message: what they said aloud, read as words by the transcription model the user
+       * picked (reach voiceWords). Only where the service marks one as spoken.
+       */
+      voice: IncomingFile | null;
+      /** It carried something reach cannot read yet (a video). */
       unreadable: boolean;
       /**
        * Why the service cannot vouch that it came from `chat` (a mail its sender's domain

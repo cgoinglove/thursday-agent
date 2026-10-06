@@ -175,6 +175,7 @@ export async function readMail(
     handle: address,
     words: body,
     files,
+    voice: null,
     unreadable: false,
     ...(refused
       ? {
@@ -610,6 +611,7 @@ export function createEmail(
         handle: mail.handle,
         words,
         files: mail.files,
+        voice: null,
         unreadable: false,
         unproven: mail.unproven,
       });
@@ -653,6 +655,7 @@ export function createEmail(
         handle: from,
         words: "",
         files: [],
+        voice: null,
         unreadable: false,
         unproven: notRead(
           arrived,

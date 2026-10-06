@@ -1,9 +1,13 @@
 import { randomInt } from "node:crypto";
 import { readFile, stat } from "node:fs/promises";
-import type { ModelMessage } from "ai";
+import { type ModelMessage, transcribe } from "ai";
 import { appEvents, presence } from "@/app/api/events/app-event.server";
 import { BROWSER_GONE_MS, REACH } from "@/config";
-import { modelErrorToString } from "@/features/ai/model";
+import {
+  buildTranscriptionModel,
+  modelErrorToString,
+  resolveMediaRef,
+} from "@/features/ai/model";
 import { clockNow } from "@/features/ai/prompts/prompt-helper";
 import { asWords } from "@/features/ai/words";
 import { answerThread } from "@/features/bot/bot.runner";
@@ -480,6 +484,9 @@ async function wordsOf(live: Live, incoming: Written): Promise<Said | null> {
   const { channel } = live;
   state.last = live.name;
   const { kept, lost } = await takeFiles(live, incoming.files);
+  const spoken = incoming.voice ? await voiceWords(live, incoming.voice) : null;
+  if (spoken && "why" in spoken)
+    lost.push({ name: "Your voice message", why: spoken.why });
   if (lost.length)
     await channel
       .say(incoming.chat, {
@@ -490,12 +497,16 @@ async function wordsOf(live: Live, incoming: Written): Promise<Said | null> {
       .catch((cause) =>
         logger.warn(`reach ${live.name}: could not say so`, cause),
       );
-  const words = [incoming.words, ...kept].filter(Boolean).join("\n");
+  const heard =
+    spoken && "words" in spoken
+      ? `[A voice message, as a transcription model heard it:] ${spoken.words}`
+      : "";
+  const words = [incoming.words, heard, ...kept].filter(Boolean).join("\n");
   if (!words) {
     if (incoming.unreadable && !lost.length)
       await channel.say(incoming.chat, {
         plain:
-          "I can read words, pictures and files here — not voice or video yet. Write it instead.",
+          "I can read words, voice messages, pictures and files here — not video yet. Write it instead.",
       });
     return null;
   }
@@ -508,6 +519,40 @@ async function wordsOf(live: Live, incoming: Written): Promise<Said | null> {
 }
 
 type Lost = { name: string; why: string };
+
+/**
+ * A voice message as words, by the transcription model picked in Settings › Models, which bills
+ * for it: with none picked it is not read (a feature that costs per use runs only on what the
+ * user picked for it), and they are told where to pick one. Past what the service hands over or
+ * REACH.fileBytes, or refused by the model, it is said why.
+ */
+async function voiceWords(
+  live: Live,
+  voice: IncomingFile,
+): Promise<{ words: string } | { why: string }> {
+  const found = await resolveMediaRef("transcription");
+  if (!found)
+    return {
+      why: "voice messages are read once a transcription model is picked in Settings › Models",
+    };
+  const most = Math.min(live.channel.limits.take, REACH.fileBytes);
+  if (voice.size && voice.size > most)
+    return {
+      why: `it is ${megabytes(voice.size)}, and the most taken from ${REACH_LABEL[live.name]} is ${megabytes(most)}`,
+    };
+  try {
+    const audio = new Uint8Array(await (await voice.fetch()).arrayBuffer());
+    const { text } = await transcribe({
+      model: buildTranscriptionModel(found.ref, found.apiKey),
+      audio,
+    });
+    return text.trim()
+      ? { words: text.trim() }
+      : { why: "the transcription model heard no words in it" };
+  } catch (cause) {
+    return { why: modelErrorToString(cause) };
+  }
+}
 
 /**
  * What they sent, kept in the workspace, and what was not, each with why: past what the
