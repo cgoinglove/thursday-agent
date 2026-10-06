@@ -1338,6 +1338,30 @@ test("a shell shows what only looks like a secret: the app's own variables and a
     await config.writeConfig(ANTHROPIC, fresh);
     assert.equal((await shell.exec(`printf ${fresh}`)).stdout, HIDDEN);
 
+    // Another data folder's key, which a checkout's .env hands Next, is hidden too
+    const other = randomBytes(32).toString("base64");
+    process.env.THURSDAY_ENCRYPTION_KEY = other;
+    assert.equal(
+      (await shell.exec(`printf '%s' '${other.replace(/=+$/, "")}'`)).stdout,
+      HIDDEN,
+    );
+    delete process.env.THURSDAY_ENCRYPTION_KEY;
+
+    // A .env put back with another key: that key is hidden from the next command
+    const kept = await readFile(ENV_PATH, "utf8");
+    const putBack = randomBytes(32).toString("base64");
+    await writeFile(ENV_PATH, `THURSDAY_ENCRYPTION_KEY=${putBack}\n`);
+    try {
+      assert.equal(
+        (await shell.exec(`printf '%s' '${putBack.replace(/=+$/, "")}'`))
+          .stdout,
+        HIDDEN,
+      );
+    } finally {
+      await writeFile(ENV_PATH, kept);
+      secret.encryptionKey();
+    }
+
     // A sign-in the environment sets is hidden by each token it holds
     process.env[CHATGPT] = JSON.stringify({
       access,
@@ -1347,6 +1371,7 @@ test("a shell shows what only looks like a secret: the app's own variables and a
     await config.writeConfig(DEFAULT_MODEL_KEY, "openai/gpt-shown-in-full");
     assert.equal((await shell.exec(`printf ${access}`)).stdout, HIDDEN);
   } finally {
+    delete process.env.THURSDAY_ENCRYPTION_KEY;
     delete process.env.npm_package_scripts_test_secrets;
     delete process.env.SOME_TOOL_TOKEN_PATH;
     delete process.env[CHATGPT];

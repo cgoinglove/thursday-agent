@@ -17,6 +17,7 @@ import {
   BROWSER_CLI,
   BROWSER_VIEWPORT,
   DATA_DIR,
+  ENV_PATH,
   HIDDEN_SECRET_MIN,
   JOB_FOLDER_WALK,
   PATHS,
@@ -35,7 +36,7 @@ import {
   SECRET_NAME,
   walkFiles,
 } from "@/lib/sandbox";
-import { encryptionKeyTexts } from "@/lib/secret";
+import { ENCRYPTION_KEY_NAME, encryptionKeyTexts } from "@/lib/secret";
 import { slug } from "@/lib/utils";
 
 /**
@@ -637,6 +638,7 @@ const FENCE: Record<string, string> = {
 
 type Pinned = typeof globalThis & {
   __storedSecrets?: { values: Promise<string[]> | null };
+  __keyTexts?: { stamp: string; texts: string[] } | null;
 };
 
 /**
@@ -668,6 +670,19 @@ function storedSecrets(): Promise<string[]> {
 }
 
 /**
+ * The data folder's key as text, read again only when its `.env` changes: the key moves only
+ * when that file is put back (lib/secret encryptionKey).
+ */
+async function keyTexts(): Promise<string[]> {
+  const info = await stat(ENV_PATH).catch(() => null);
+  const stamp = info ? `${info.size}:${info.mtimeMs}` : "";
+  const pinned = globalThis as Pinned;
+  if (pinned.__keyTexts?.stamp !== stamp)
+    pinned.__keyTexts = { stamp, texts: encryptionKeyTexts() };
+  return pinned.__keyTexts.texts;
+}
+
+/**
  * The secrets the app holds, as a command could print them, for every shell to hide from what it
  * prints: the key `local.db`'s secrets are sealed with, which sits in plain text in the data
  * folder's `.env`; every key, token and sign-in Settings and the connectors keep; and what the
@@ -677,10 +692,15 @@ function storedSecrets(): Promise<string[]> {
  * no credential does: a connector's folder or a tool's socket is shown as it is.
  */
 async function heldSecrets(): Promise<string[]> {
-  const fromEnv = Object.entries(process.env).flatMap(([name, value]) =>
-    SECRET_NAME.test(name) && !APP_OWN.test(name) && value ? [value] : [],
-  );
-  const all = [...encryptionKeyTexts(), ...(await storedSecrets()), ...fromEnv];
+  // The app's own variables are not secrets, but for a key a checkout's `.env` hands Next,
+  // which is another data folder's when this one is not the checkout's
+  const fromEnv = Object.entries(process.env).flatMap(([name, value]) => {
+    if (!value) return [];
+    // As a file may hold it, the padding left off: hiding that hides the padded one too
+    if (name === ENCRYPTION_KEY_NAME) return [value.trim().replace(/=+$/, "")];
+    return SECRET_NAME.test(name) && !APP_OWN.test(name) ? [value] : [];
+  });
+  const all = [...(await keyTexts()), ...(await storedSecrets()), ...fromEnv];
   return all
     .map((value) => value.trim())
     .filter(

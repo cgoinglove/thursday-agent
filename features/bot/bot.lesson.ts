@@ -312,10 +312,13 @@ export async function undoLesson(id: number): Promise<string> {
   else bag?.delete(keyOf(row.kind, row.name));
   await markLessonUndone(id);
 
+  // What the app held no text of before the job: gone since, or changed by the job into what
+  // stands now, it could not be put back. One the job left alone is not in question.
+  const changed = new Set(pathsOf(row));
   const lost = (row.before?.unheld ?? []).filter(
-    (path) => !now?.stamps.has(path),
+    (path) => changed.has(path) || !now?.stamps.has(path),
   );
   return lost.length
-    ? `Put back, but for ${lost.join(", ")}: the app keeps no text of ${lost.length === 1 ? "it" : "them"}, so ${lost.length === 1 ? "it" : "they"} could not be brought back.`
+    ? `Put back, but for ${lost.join(", ")}: the app kept no text of ${lost.length === 1 ? "it" : "them"} from before this job, so ${lost.length === 1 ? "it is" : "they are"} as the job left ${lost.length === 1 ? "it" : "them"}.`
     : "Put back.";
 }
