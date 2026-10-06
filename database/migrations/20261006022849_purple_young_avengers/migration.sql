@@ -1,0 +1,1 @@
+ALTER TABLE `bot_lesson` ADD `line` text DEFAULT '' NOT NULL;

@@ -63,7 +63,8 @@ job under **Kept for next time**, and on its page under **Learned**, newest firs
 came from. A row opens to the note or skill as the job left it, and **Undo** puts it back as it was
 before that job, or deletes it when the job wrote it new. It is read from what changed on disk, so
 a bot that says it kept something and did not shows nothing. A note or skill changed again since
-is put back only after the later change.
+is put back only after the later change. A lesson is cleared after three months, with the jobs;
+what the bot kept stays, and only Undo for it goes.
 
 ## A job is a thread
 

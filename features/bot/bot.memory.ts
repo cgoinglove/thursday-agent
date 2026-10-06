@@ -53,16 +53,26 @@ export async function listBotMemory(
   return { folder, entries, total: files.length };
 }
 
-/** What counts as a memory file, for the listing and the limits alike: a plain file, not hidden. */
+/**
+ * What counts as a memory file, for the listing and the limits alike: a plain file, not hidden.
+ * A folder or file that cannot be read is left out; `strict`, only one that is not there is, and
+ * any other failure is thrown (bot.lesson, which would take it for a file removed).
+ */
 export async function readMemoryFolder(
   dir: string,
+  { strict = false }: { strict?: boolean } = {},
 ): Promise<{ name: string; info: Stats }[]> {
-  const names = await readdir(dir).catch(() => []);
+  const absent = (cause: unknown) => {
+    if (strict && (cause as NodeJS.ErrnoException).code !== "ENOENT")
+      throw cause;
+    return null;
+  };
+  const names = (await readdir(dir).catch(absent)) ?? [];
   const found = await Promise.all(
     names
       .filter((name) => !name.startsWith("."))
       .map(async (name) => {
-        const info = await stat(join(dir, name)).catch(() => null);
+        const info = await stat(join(dir, name)).catch(absent);
         return info?.isFile() ? { name, info } : null;
       }),
   );

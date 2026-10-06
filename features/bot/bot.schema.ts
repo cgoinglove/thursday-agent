@@ -273,8 +273,9 @@ export type BotMemory = {
 export type LessonKind = "memory" | "skill";
 
 /**
- * The files one thing a bot keeps held at one moment, by workspace path: their text, and the
- * paths it holds that are not text the app keeps (a picture, a file past BOT_LESSON.fileChars).
+ * Files of one thing a bot keeps, by workspace path: their text, and every path the thing holds
+ * that is not text the app keeps (a picture, a file past BOT_LESSON.fileChars). Held whole while
+ * a command runs; a lesson keeps only the files its job changed (lesson.query changeOf).
  */
 export type KeptFiles = { files: Record<string, string>; unheld: string[] };
 
@@ -298,7 +299,7 @@ export type BotLesson = {
   /** Lines added and taken out, over the text files it holds. */
   added: number;
   removed: number;
-  /** The memory file or the skill's SKILL.md as the job left it (as it was, when removed), clipped. */
+  /** What the job left of each file it changed (what it removed, when it removed it), clipped. */
   text: string;
   at: Date;
   undoneAt: Date | null;

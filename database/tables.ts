@@ -542,9 +542,14 @@ export const botLessonTable = sqliteTable(
     kind: text("kind").notNull().$type<LessonKind>(),
     /** The memory file's name, or the skill's folder. */
     name: text("name").notNull(),
-    /** Null when it was not there before: written new. */
+    /** What it is about, as it read once changed: a memory file's first line, a skill's description. */
+    line: text("line").notNull().default(""),
+    /**
+     * The files the job changed, as it found them (lesson.query changeOf): their text, and
+     * every file it held that is not text. Null when it was not there before: written new.
+     */
     before: text("before", { mode: "json" }).$type<KeptFiles>(),
-    /** Null when it is gone after: removed. */
+    /** The same files as the job left them. Null when it is gone after: removed. */
     after: text("after", { mode: "json" }).$type<KeptFiles>(),
     createdAt: int("created_at", { mode: "timestamp" })
       .notNull()

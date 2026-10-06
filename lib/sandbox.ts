@@ -77,19 +77,26 @@ const IGNORE = new Set([
 
 /**
  * Every file under `dir`, skipping dot entries and the folders a build or a
- * package manager fills (IGNORE). A folder that cannot be read yields nothing.
+ * package manager fills (IGNORE). A folder that cannot be read yields nothing;
+ * `strict`, only one that is not there does, and any other failure is thrown, for
+ * a reader that would take a folder it could not read for an empty one.
  */
-export async function* walkFiles(dir: string): AsyncGenerator<string> {
+export async function* walkFiles(
+  dir: string,
+  { strict = false }: { strict?: boolean } = {},
+): AsyncGenerator<string> {
   let entries;
   try {
     entries = await readdir(dir, { withFileTypes: true });
-  } catch {
+  } catch (cause) {
+    if (strict && (cause as NodeJS.ErrnoException).code !== "ENOENT")
+      throw cause;
     return;
   }
   for (const e of entries) {
     if (IGNORE.has(e.name) || e.name.startsWith(".")) continue;
     const full = join(dir, e.name);
-    if (e.isDirectory()) yield* walkFiles(full);
+    if (e.isDirectory()) yield* walkFiles(full, { strict });
     else if (e.isFile()) yield full;
   }
 }

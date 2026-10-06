@@ -786,6 +786,148 @@ test("what a bot keeps is noted from the disk, folded within a job, and put back
   }
 });
 
+test("a lesson keeps only the files its job changed, and Undo keeps to them, to its thing's folder and to what it could not bring back", async () => {
+  const { chmod, mkdir: makeDir } = await import("node:fs/promises");
+  const { existsSync } = await import("node:fs");
+  const { createWorkspaceTools } = await import(
+    "../features/ai/tools/workspace.tool.ts"
+  );
+  const { openWorkspace } = await import("../features/workspace/workspace.ts");
+  const { listLessons } = await import("../features/bot/lesson.query.ts");
+  const { undoLesson } = await import("../features/bot/bot.lesson.ts");
+  const { botLessonTable } = await import("../database/tables.ts");
+  plans.set("Alpha", [() => text("Done.")]);
+  const id = await startThread({
+    bot: "Alpha",
+    request: "Tidy up",
+    label: "Tidying",
+    from: "user",
+  });
+  await waitFor(id, "done");
+  const shell = createWorkspaceTools(await openWorkspace(), {
+    write: true,
+    bot: "Echo",
+    thread: id,
+  });
+  const run = (command: string) =>
+    shell[T.bash].execute!(
+      { command },
+      { toolCallId: "tidy", messages: [], context: {} },
+    );
+  const folder = join(WORKSPACE, "bots/Echo");
+  const skills = join(folder, ".agents/skills");
+  const skill = "bots/Echo/.agents/skills/tidy";
+  const rowOf = async (name: string) =>
+    (await database.select().from(botLessonTable)).find(
+      (row) => row.bot === "Echo" && row.name === name && !row.undoneAt,
+    );
+  await rm(folder, { recursive: true, force: true });
+  // A skill the bot had before this job: its words, a reference, a picture
+  await makeDir(join(WORKSPACE, skill), { recursive: true });
+  await writeFile(
+    join(WORKSPACE, skill, "SKILL.md"),
+    "---\nname: tidy\ndescription: Tidy a folder by kind\n---\n# Steps\n",
+  );
+  await writeFile(join(WORKSPACE, skill, "ref.md"), "Reference\n");
+  await writeFile(
+    join(WORKSPACE, skill, "logo.png"),
+    new Uint8Array([0x89, 0xff, 0xfe, 0x00]),
+  );
+  try {
+    // One file changed: the lesson holds that file alone, told by the skill's description
+    await run(`printf 'Reference, kinds first\\n' > ${skill}/ref.md`);
+    let row = await rowOf("tidy");
+    assert.deepEqual(Object.keys(row?.before?.files ?? {}), [
+      `${skill}/ref.md`,
+    ]);
+    assert.deepEqual(Object.keys(row?.after?.files ?? {}), [`${skill}/ref.md`]);
+    assert.equal(row?.line, "Tidy a folder by kind");
+    // A file added in the same job folds into that lesson, from how the job found the skill
+    await run(`printf 'Notes\\n' > ${skill}/notes.md`);
+    row = await rowOf("tidy");
+    assert.equal(row?.before?.files[`${skill}/ref.md`], "Reference\n");
+    assert.deepEqual(Object.keys(row?.after?.files ?? {}).sort(), [
+      `${skill}/notes.md`,
+      `${skill}/ref.md`,
+    ]);
+    // Back as the job found it: no lesson left
+    await run(
+      `printf 'Reference\\n' > ${skill}/ref.md && rm ${skill}/notes.md`,
+    );
+    assert.equal(await rowOf("tidy"), undefined);
+
+    // A folder a command leaves unreadable is not taken for everything in it removed
+    try {
+      await run("chmod 000 bots/Echo/.agents/skills");
+    } finally {
+      await chmod(skills, 0o755);
+    }
+    await run("true");
+    assert.equal(await rowOf("tidy"), undefined);
+
+    // Undo while another of the bot's commands runs: that command's change is still noted
+    await run(
+      `mkdir -p bots/Echo/memory && printf 'Old\\n' > bots/Echo/memory/other.md`,
+    );
+    const other = (await listLessons({ thread: id })).find(
+      (one) => one.name === "other.md",
+    );
+    const slow = run(
+      "printf 'In flight\\n' > bots/Echo/memory/inflight.md && sleep 0.4",
+    );
+    await waitUntil(
+      async () => existsSync(join(folder, "memory/inflight.md")),
+      "the slow command never wrote",
+    );
+    assert.equal(await undoLesson(other!.id), "Put back.");
+    await slow;
+    assert.ok(
+      (await listLessons({ thread: id })).some(
+        (one) => one.name === "inflight.md" && !one.undoneAt,
+      ),
+    );
+
+    // A skill removed whole comes back but for its picture, which the answer names
+    await run(`rm -rf ${skill}`);
+    const removed = (await listLessons({ thread: id })).find(
+      (one) => one.name === "tidy" && one.change === "removed",
+    );
+    assert.equal(
+      await undoLesson(removed!.id),
+      `Put back, but for ${skill}/logo.png: the app keeps no text of it, so it could not be brought back.`,
+    );
+    assert.equal(
+      await readFile(join(WORKSPACE, skill, "ref.md"), "utf8"),
+      "Reference\n",
+    );
+
+    // A row that names a path out of its thing's folder is refused before anything is touched
+    await run(`printf 'Kept\\n' > bots/Echo/memory/kept.md`);
+    const kept = await rowOf("kept.md");
+    await database
+      .update(botLessonTable)
+      .set({
+        after: {
+          files: {
+            "bots/Echo/memory/kept.md/../../../../escaped.md": "Kept\n",
+          },
+          unheld: [],
+        },
+      })
+      .where(eq(botLessonTable.id, kept!.id));
+    await assert.rejects(undoLesson(kept!.id), /outside what it changed/);
+    await database
+      .update(botLessonTable)
+      .set({ name: "../../escaped" })
+      .where(eq(botLessonTable.id, kept!.id));
+    await assert.rejects(undoLesson(kept!.id), /not one note or skill/);
+    assert.equal(existsSync(join(folder, "memory/kept.md")), true);
+  } finally {
+    await chmod(skills, 0o755).catch(() => {});
+    await rm(folder, { recursive: true, force: true });
+  }
+});
+
 test("natural turns send asynchronously and retain participant histories", async () => {
   plans.set("Alpha", [
     () =>

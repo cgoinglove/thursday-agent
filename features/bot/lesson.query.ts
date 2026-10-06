@@ -20,10 +20,11 @@ const changed = () => {
 };
 
 /**
- * Notes that `bot` changed one thing it keeps, in one job. Folded into the row that job
- * already has for it while that row is not put back and ends where this change begins, so a
- * job that writes a file three times shows one lesson; a change that puts it back as that
- * row began leaves nothing. Otherwise a row of its own.
+ * Notes that `bot` changed one thing it keeps, in one job, given that thing whole as it stood
+ * before the command and after it. Only what differs is kept (`changeOf`). Folded into the row
+ * the job already has for it while that row is not put back and ends where this change begins,
+ * so a job that writes a file three times shows one lesson, from how the job found it to how it
+ * left it; one that ends as the job found it leaves nothing. Otherwise a row of its own.
  */
 export async function noteLesson(input: {
   bot: string;
@@ -50,28 +51,112 @@ export async function noteLesson(input: {
       )
       .orderBy(desc(lesson.id))
       .limit(1);
-    if (last && sameKept(last.after, input.before)) {
-      if (sameKept(last.before, input.after)) {
-        await tx.delete(lesson).where(eq(lesson.id, last.id));
-      } else {
+    const folds = last && continues(last, input.before);
+    const start = folds ? startOf(last, input.before) : input.before;
+    const change = changeOf(start, input.after);
+    const line = lineOf(input.kind, input.name, input.after ?? start);
+    if (folds) {
+      if (!change) await tx.delete(lesson).where(eq(lesson.id, last.id));
+      else
         await tx
           .update(lesson)
-          .set({ after: input.after, updatedAt: new Date() })
+          .set({ ...change, line, updatedAt: new Date() })
           .where(eq(lesson.id, last.id));
-      }
       return;
     }
+    if (!change) return;
     await tx.insert(lesson).values({
       bot: input.bot,
       threadId: input.thread?.id ?? null,
       threadLabel: input.thread?.label ?? "",
       kind: input.kind,
       name: input.name,
-      before: input.before,
-      after: input.after,
+      line,
+      ...change,
     });
   });
   changed();
+}
+
+/** A file's text on one side of a change; null where it is not there as text. */
+export const textAt = (kept: KeptFiles | null, path: string): string | null =>
+  kept?.files[path] ?? null;
+
+/** Every file a lesson changed, on either side. */
+export const pathsOf = (row: Pick<LessonRow, "before" | "after">) => [
+  ...new Set([
+    ...Object.keys(row.before?.files ?? {}),
+    ...Object.keys(row.after?.files ?? {}),
+    ...difference(row.before?.unheld ?? [], row.after?.unheld ?? []),
+    ...difference(row.after?.unheld ?? [], row.before?.unheld ?? []),
+  ]),
+];
+
+const difference = (a: string[], b: string[]) =>
+  a.filter((path) => !b.includes(path));
+
+/**
+ * What a change did, from a thing whole as it stood (`start`) to whole as it stands (`end`),
+ * null on the side where it was not there: the text of each file that differs, on the side it
+ * has text (a file on one side only was written or removed), and every file each side holds
+ * that is not text the app keeps. Null when nothing differs.
+ */
+export function changeOf(
+  start: KeptFiles | null,
+  end: KeptFiles | null,
+): { before: KeptFiles | null; after: KeptFiles | null } | null {
+  if (!start && !end) return null;
+  const paths = new Set([
+    ...Object.keys(start?.files ?? {}),
+    ...Object.keys(end?.files ?? {}),
+  ]);
+  const differ = [...paths].filter(
+    (path) => textAt(start, path) !== textAt(end, path),
+  );
+  if (
+    start &&
+    end &&
+    !differ.length &&
+    !difference(start.unheld, end.unheld).length &&
+    !difference(end.unheld, start.unheld).length
+  )
+    return null;
+  const side = (kept: KeptFiles | null): KeptFiles | null =>
+    kept && {
+      files: Object.fromEntries(
+        differ.flatMap((path) =>
+          path in kept.files ? [[path, kept.files[path]]] : [],
+        ),
+      ),
+      unheld: [...kept.unheld],
+    };
+  return { before: side(start), after: side(end) };
+}
+
+/** Whether the thing stands, at `whole`, as the row left it: the row's change goes on from there. */
+function continues(row: LessonRow, whole: KeptFiles | null): boolean {
+  if ((row.after === null) !== (whole === null)) return false;
+  return Object.keys({ ...row.before?.files, ...row.after?.files }).every(
+    (path) => textAt(row.after, path) === textAt(whole, path),
+  );
+}
+
+/** The thing whole as the row's job found it: as it stands at `whole`, with the row's change undone. */
+function startOf(row: LessonRow, whole: KeptFiles | null): KeptFiles | null {
+  if (!row.before) return null;
+  const files = { ...whole?.files };
+  for (const path of Object.keys({ ...row.before.files, ...row.after?.files }))
+    if (path in row.before.files) files[path] = row.before.files[path];
+    else delete files[path];
+  return { files, unheld: [...row.before.unheld] };
+}
+
+/** What a thing is about: a memory file's first line, a skill's description, else its name. */
+function lineOf(kind: LessonKind, name: string, kept: KeptFiles | null) {
+  const main = Object.entries(kept?.files ?? {})
+    .filter(([path]) => kind === "memory" || path.endsWith("/SKILL.md"))
+    .sort(([a], [b]) => a.length - b.length)[0];
+  return (main && listingLine(main[1])) || name;
 }
 
 /** One job's lessons, oldest first, or one bot's, newest first (BOT_LESSON.listed). */
@@ -132,17 +217,29 @@ export function sameKept(a: KeptFiles | null, b: KeptFiles | null): boolean {
 }
 
 function toLesson(row: LessonRow): BotLesson {
-  const now = row.after ?? row.before;
   // Lines with words on them: a blank line moved is no change worth a number
   const lines = (kept: KeptFiles | null) =>
     Object.values(kept?.files ?? {}).flatMap((text) =>
       text.split("\n").filter((line) => line.trim()),
     );
   const { added, removed } = lineChange(lines(row.before), lines(row.after));
-  // A skill is told by its SKILL.md; a memory file by its own first line
-  const main = Object.entries(now?.files ?? {}).find(
-    ([path]) => row.kind === "memory" || path.endsWith("/SKILL.md"),
-  );
+  // What the job left of each file it changed, or what it removed; a skill's files under their names
+  const side = row.after ?? row.before;
+  const changedFiles = Object.entries(side?.files ?? {});
+  const text =
+    row.kind === "memory"
+      ? (changedFiles[0]?.[1] ?? "")
+      : [
+          ...changedFiles.map(
+            ([path, words]) =>
+              `# ${inside(path, row.name)}\n${words.trimEnd()}`,
+          ),
+          ...pathsOf(row)
+            .filter(
+              (path) => !textAt(row.before, path) && !textAt(row.after, path),
+            )
+            .map((path) => `# ${inside(path, row.name)} (not text)`),
+        ].join("\n\n");
   return {
     id: row.id,
     bot: row.bot,
@@ -150,14 +247,20 @@ function toLesson(row: LessonRow): BotLesson {
     threadLabel: row.threadLabel,
     kind: row.kind,
     name: row.name,
-    line: (main && listingLine(main[1])) || row.name,
+    line: row.line || row.name,
     change: !row.before ? "added" : !row.after ? "removed" : "changed",
     added,
     removed,
-    text: shown(main?.[1] ?? ""),
+    text: shown(text),
     at: row.updatedAt,
     undoneAt: row.undoneAt,
   };
+}
+
+/** A path as it reads inside the thing it belongs to: `scripts/run.mjs` of a skill. */
+function inside(path: string, name: string): string {
+  const at = path.indexOf(`/${name}/`);
+  return at === -1 ? path : path.slice(at + name.length + 2);
 }
 
 /** A file's text as a lesson's row opens to, its lines kept, cut at BOT_LESSON.shownChars. */
