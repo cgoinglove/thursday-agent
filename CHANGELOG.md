@@ -1,5 +1,27 @@
 # Changelog
 
+## [0.30.0](https://github.com/cgoinglove/thursday-agent/compare/thursday-agent-v0.29.0...thursday-agent-v0.30.0) (2026-10-06)
+
+
+### Features
+
+* **bots:** what a bot keeps for itself is shown, from the disk, and Undo puts it back ([05eed45](https://github.com/cgoinglove/thursday-agent/commit/05eed450c0f437804c783f8fdb5fa538b50ab27d))
+* **reach:** a voice message from the phone is read as words by the transcription model picked ([0ca84d2](https://github.com/cgoinglove/thursday-agent/commit/0ca84d2e7fdf579741ffbe243f0816f0d4bb4f8b))
+* **room:** Stop all stops every thread at work, from the room or by asking her ([555c156](https://github.com/cgoinglove/thursday-agent/commit/555c156c919bb1adc091de23506e6620c3cb57fe))
+* **routines:** a routine its bot watches opens a run only when what it waits on changes ([7cbbe9a](https://github.com/cgoinglove/thursday-agent/commit/7cbbe9a5ce70865701472f294c4916c3e700f9f8))
+* **routines:** Settings › Routines shows what a routine watches, and Stop watching ([fe5d6d7](https://github.com/cgoinglove/thursday-agent/commit/fe5d6d794722e301592592dd9c0fd7f3072be871))
+
+
+### Fixes
+
+* **bots:** a lesson is cleared by age with the jobs, its record only ([135d20a](https://github.com/cgoinglove/thursday-agent/commit/135d20a6316462eeff777b002fc9962745bfaf28))
+* **bots:** a lesson keeps only what its job changed, and Undo keeps to it ([af4d659](https://github.com/cgoinglove/thursday-agent/commit/af4d6597cb1daac66d839a901a6327eea9998826))
+* **reach:** an audio file sent on Telegram reaches her as a file ([678ed0e](https://github.com/cgoinglove/thursday-agent/commit/678ed0ee2d8d68f6091b798cbb49baff3a9cc645))
+* **routines:** a watch decides only between repeated starts of the job it was written for ([00a2377](https://github.com/cgoinglove/thursday-agent/commit/00a2377a6219c73938a0de54ed32e8e57270353e))
+* **workbench:** a checkout's key is hidden again, and Undo names every file it could not restore ([05ab00f](https://github.com/cgoinglove/thursday-agent/commit/05ab00fa795e9767668bec15992923f04657f892))
+* **workbench:** a shell hides real secrets only, read once until one changes ([9e5c970](https://github.com/cgoinglove/thursday-agent/commit/9e5c97015a318d6c69907188f4978d0eeecba223))
+* **workbench:** what a shell prints hides the secrets the app keeps ([7c6775e](https://github.com/cgoinglove/thursday-agent/commit/7c6775e55ac97baa29deca9bc3677661c6780969))
+
 ## [0.29.0](https://github.com/cgoinglove/thursday-agent/compare/thursday-agent-v0.28.0...thursday-agent-v0.29.0) (2026-10-05)
 
 
