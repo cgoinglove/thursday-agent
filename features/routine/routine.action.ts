@@ -7,7 +7,6 @@ import { runRoutineNow } from "./routine.clock";
 import {
   createRoutine,
   deleteRoutine,
-  findRoutine,
   setRoutineWatch,
   updateRoutine,
 } from "./routine.query";
@@ -38,6 +37,5 @@ export const runRoutineNowAction = serverAction(async (id: string) => ({
 
 /** Settings › Routines' Stop watching: every start opens a run again, until its bot sets a watch. */
 export const stopWatchingAction = serverAction(async (id: string) => {
-  if (!(await findRoutine(id))) publicError("Routine not found");
-  await setRoutineWatch(id, null);
+  if (!(await setRoutineWatch(id, null))) publicError("Routine not found");
 });

@@ -7,6 +7,7 @@ import { findThread } from "@/features/bot/thread.query";
 import {
   createRoutine,
   deleteRoutine,
+  findRoutine,
   listRoutines,
   resolveRoutine,
   setRoutineWatch,
@@ -117,6 +118,20 @@ function told(routine: Routine) {
     enabled: routine.enabled,
     ...(routine.enabled ? { next: whenOf(toDate(routine.nextRunAt)) } : {}),
     request: clip(routine.request, PROMPT_LINE.routineRequest),
+    // Starts its watch found unchanged open no run: without this, missing runs read as a fault
+    ...(routine.watch
+      ? {
+          watch: {
+            command: clip(routine.watch, PROMPT_LINE.routineRequest),
+            ...(routine.watchedAt && routine.watchLast
+              ? {
+                  lastLook: routine.watchLast,
+                  at: whenOf(toDate(routine.watchedAt)),
+                }
+              : {}),
+          },
+        }
+      : {}),
     ...(last
       ? {
           lastRun: {
@@ -241,6 +256,11 @@ export async function createRoutineWatchTool(
           ),
       }),
       execute: async ({ command }) => {
+        const routine = await findRoutine(routineId);
+        if (!routine)
+          return "That routine is gone, so there is nothing to watch.";
+        if (routine.schedule.kind === "once")
+          return "Not set: it starts once, so it has no later start to watch for.";
         const watch = command?.trim();
         if (!watch) {
           await setRoutineWatch(routineId, null);
@@ -249,7 +269,13 @@ export async function createRoutineWatchTool(
         const looked = await runWatch(watch);
         if ("failed" in looked)
           return `Not set: it failed (${looked.failed}). Fix the command and set it again.`;
-        await setRoutineWatch(routineId, { command: watch, saw: looked.saw });
+        if (
+          !(await setRoutineWatch(routineId, {
+            command: watch,
+            saw: looked.saw,
+          }))
+        )
+          return "That routine is gone, so there is nothing to watch.";
         return `Set. It prints now:\n${looked.saw || "(nothing)"}\nA start opens a run only once that changes.`;
       },
     }),

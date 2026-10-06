@@ -324,8 +324,11 @@ A routine that waits for something — "tell me when the coat is under 150", "wh
 — can be given a **watch** by its own bot, during one of its runs: a command that prints what it
 waits on. At each later time only that command runs, and a run opens only when what it prints has
 changed since the last run, so a check that finds nothing new costs no model and wakes nobody. A
-watch that fails opens a run, and the bot is told to fix it. **Run now** always opens a run. The
-bot's thread shows the command it set. In **Settings › Routines** a watched routine's row says what
+watch that fails opens a run, and the bot is told to fix it. **Run now** always opens a run, and a
+routine that starts **Once** always runs: a watch only decides between repeated starts. Changing the
+routine's job or its bot, or setting it to start once, takes the watch off, since it was written for
+the old one. Thursday can say what a routine watches and what its last look found. The bot's thread
+shows the command it set. In **Settings › Routines** a watched routine's row says what
 its last look found — no change, changed, or watch failed — and when; its sheet shows the command
 under **Watch**, and **Stop watching** (after asking) takes it off, so every start opens a run again
 until the bot sets one.

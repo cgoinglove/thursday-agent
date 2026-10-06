@@ -66,8 +66,8 @@ async function open(
 async function startWatched(row: Row & { watch: string }): Promise<void> {
   const looked = await runWatch(row.watch);
   if ("failed" in looked) {
-    await noteWatched(row.id, "failed");
     await open(row, { command: row.watch, failed: looked.failed });
+    await noteWatched(row.id, "failed");
     return;
   }
   if (looked.saw === row.watchSaw) {
@@ -75,12 +75,13 @@ async function startWatched(row: Row & { watch: string }): Promise<void> {
     logger.info(`routine "${row.label}": its watch saw no change`);
     return;
   }
-  await noteWatched(row.id, "changed", looked.saw);
+  // Kept as seen once its run has opened: a run that could not open leaves the change to the next look
   await open(row, {
     command: row.watch,
     now: looked.saw,
     before: row.watchSaw,
   });
+  await noteWatched(row.id, "changed", looked.saw);
 }
 
 /**
@@ -106,7 +107,8 @@ export async function startDueRoutines(now = new Date()) {
       logger.info(`routine "${row.label}" skipped: its last run is still open`);
       continue;
     }
-    const { watch } = row;
+    // A start that comes once is the job itself, whatever a watch would say
+    const watch = row.schedule.kind === "once" ? null : row.watch;
     await (watch ? startWatched({ ...row, watch }) : open(row)).catch((cause) =>
       logger.error(`routine "${row.label}" could not start`, cause),
     );
@@ -119,7 +121,10 @@ export async function runRoutineNow(id: string): Promise<string> {
   if (!routine) publicError("No such routine.");
   if (isOpen(routine.runs[0]))
     publicError("Its last run is still open. Answer or stop that one first.");
-  return open(routine);
+  return open(
+    routine,
+    routine.watch ? { command: routine.watch, byHand: true } : null,
+  );
 }
 
 type Pinned = typeof globalThis & { __routineClock?: NodeJS.Timeout };

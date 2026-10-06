@@ -132,12 +132,22 @@ export async function updateRoutine(
     (patch.enabled && !was.enabled);
   // only a moment being given or switched on is asked about: one waiting to start is due, not spent
   if (restarts) refuseSpentMoment(schedule, patch.enabled ?? was.enabled);
+  const bot = patch.bot ? await botNamed(patch.bot) : was.bot;
+  // A watch is its bot's command for its job: another job or bot, or a start that comes once,
+  // leaves nothing for it to decide (routine.watch)
+  const unwatched =
+    (patch.request !== undefined && patch.request !== was.request) ||
+    bot !== was.bot ||
+    schedule.kind === "once";
   const [row] = await database
     .update(routineTable)
     .set({
       ...patch,
-      ...(patch.bot ? { bot: await botNamed(patch.bot) } : {}),
+      ...(patch.bot ? { bot } : {}),
       ...(restarts ? { nextRunAt: nextRun(schedule, new Date()) } : {}),
+      ...(unwatched && was.watch
+        ? { watch: null, watchSaw: null, watchedAt: null, watchLast: null }
+        : {}),
     })
     .where(eq(routineTable.id, id))
     .returning();
@@ -195,12 +205,13 @@ export async function claimRoutine(row: Row, now: Date): Promise<boolean> {
 /**
  * Sets what the routine watches (routine_watch), with what it printed as it was set: the next
  * start opens a run only once that differs. Null watches nothing, and every start opens a run.
+ * False when there is no such routine.
  */
 export async function setRoutineWatch(
   id: string,
   watch: { command: string; saw: string } | null,
-): Promise<void> {
-  await database
+): Promise<boolean> {
+  const set = await database
     .update(routineTable)
     .set({
       watch: watch?.command ?? null,
@@ -208,8 +219,10 @@ export async function setRoutineWatch(
       watchedAt: watch ? new Date() : null,
       watchLast: null,
     })
-    .where(eq(routineTable.id, id));
-  changed();
+    .where(eq(routineTable.id, id))
+    .returning({ id: routineTable.id });
+  if (set.length) changed();
+  return set.length > 0;
 }
 
 /** That the watch ran at a start and what it found; `saw`, what a change printed, is kept to compare with. */

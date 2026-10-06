@@ -314,10 +314,14 @@ export type ThreadRoutine = {
   /** "Daily 09:00 · Mon–Fri" (routine.schema scheduleText). */
   when: string;
   last: { at: Date; said: string } | null;
-  /** Why a watched routine opened this run (routine.clock): what its watch printed now and before, or how it failed. */
+  /**
+   * A watched routine's run (routine.clock): what its watch printed now and before, how it
+   * failed, or that a person started it by hand.
+   */
   watch?:
     | { command: string; now: string; before: string | null }
     | { command: string; failed: string }
+    | { command: string; byHand: true }
     | null;
 };
 

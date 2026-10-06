@@ -530,10 +530,12 @@ async function buildTools(run: ToolRun): Promise<ToolSet> {
     // Sign-ins are the app's to keep and the user's to lend (tools/signin.tool); the state
     // goes into this participant's own browser, the one its shell drives
     ...createSignInTools(sandbox, run.bot, jobShellEnv(run.session)),
-    // A routine's own bot, in that routine's run, sets what the routine watches (routine.watch)
-    ...(await createRoutineWatchTool(run.bot, run.thread ?? null)),
     // Absent unless the list in its prompt cut a line short (tools/bot.tool)
     ...(await createThreadRecallTool(run.bot, run.thread ?? null)),
+    // A routine's own bot, in that routine's run, sets what the routine watches (routine.watch):
+    // after every tool a run had before it, so their cached prefix stays as it was, and before
+    // the mail tools, which can come mid-thread
+    ...(await createRoutineWatchTool(run.bot, run.thread ?? null)),
     // Absent until the user gives her a mailbox (Settings › Phone › Email): last, so the
     // set before it stays as it was cached
     ...(await createMailTools()),
