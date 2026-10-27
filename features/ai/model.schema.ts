@@ -474,8 +474,9 @@ export function parseMediaModel(
 }
 
 /**
- * Suggested text models per provider, cheapest first. Suggestions, not a validation list;
- * `defaultModelOf` reads tiers, not positions.
+ * Suggested text models per provider, smallest shelf first. Suggestions, not a validation list;
+ * `defaultModelOf` reads a tier and takes the first model on that shelf, so where a shelf holds
+ * more than one, their order there is what a user who picked nothing runs.
  */
 export const TEXT_MODEL_PROVIDERS: Record<
   TextModelProviderId,
@@ -516,6 +517,13 @@ export const TEXT_MODEL_PROVIDERS: Record<
         efforts: ["low", "medium", "high", "xhigh"],
       },
       {
+        id: "gpt-6.1-terra",
+        label: "6.1 Terra",
+        tier: "mid",
+        context: 1_050_000,
+        efforts: ["none", "low", "medium", "high", "xhigh"],
+      },
+      {
         id: "gpt-6-astra",
         label: "6 Astra",
         tier: "large",
@@ -549,6 +557,13 @@ export const TEXT_MODEL_PROVIDERS: Record<
         tier: "mid",
         context: 272_000,
         efforts: ["low", "medium", "high", "xhigh"],
+      },
+      {
+        id: "gpt-6.1-terra",
+        label: "6.1 Terra",
+        tier: "mid",
+        context: 272_000,
+        efforts: ["none", "low", "medium", "high", "xhigh"],
       },
       {
         id: "gpt-6-astra",
