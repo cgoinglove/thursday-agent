@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.31.0](https://github.com/cgoinglove/thursday-agent/compare/thursday-agent-v0.30.0...thursday-agent-v0.31.0) (2026-10-28)
+
+
+### Features
+
+* **providers:** GPT-6.1 Terra on the mid shelf, behind 6.1 Sol ([3169946](https://github.com/cgoinglove/thursday-agent/commit/31699467e97de1384c98ced3ed00a75123d58832))
+
 ## [0.30.0](https://github.com/cgoinglove/thursday-agent/compare/thursday-agent-v0.29.0...thursday-agent-v0.30.0) (2026-10-06)
 
 
