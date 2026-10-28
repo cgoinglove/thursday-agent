@@ -79,7 +79,7 @@
     "@openrouter/ai-sdk-provider": "^3.1.0",
     "@playwright/cli": "0.1.21",
     "@streamdown/cjk": "^1.0.3",
-    "@streamdown/code": "^1.1.1",
+    "@streamdown/code": "^2.0.0",
     "@streamdown/math": "^1.0.2",
     "@streamdown/mermaid": "^1.0.2",
     "ai": "^7.0.123",
